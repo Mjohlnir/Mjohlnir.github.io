@@ -1,0 +1,36 @@
+name: Atlas — regressão das bibliotecas
+on:
+  push:
+    branches: [feat/restore-python-site-parity]
+  pull_request:
+    paths: ['index.html','atlas-cloud.js','atlas-library-shared.js','tests/**','.github/workflows/library-parity.yml']
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/library-progress.cjs
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          npm install --no-save --ignore-scripts playwright@1.65.1
+          npx playwright install --with-deps chromium
+      - run: node tests/library-progress-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-paridade-capturas
+          path: artifacts/

@@ -14,7 +14,7 @@ function scoreTen(v,format){if(v==null||v==='')return null;let n=Number(v);if(!N
 function normalizeEntry(e,format){if(!e?.media?.id)return null;const id=Number(e.media.id),score=scoreTen(e.score,format);if(!Number.isSafeInteger(id)||id<=0)return null;const progress=Math.max(0,Math.round(Number(e.progress)||0));return {user_id:account.id,media_type:'MANGA',anilist_id:id,status:e.status||null,progress,personal_score:score,payload:{...e,score:score??0,media:e.media},updated_at:new Date().toISOString()};}
 function libraryPayload(){return {data:{MediaListCollection:{lists:[{entries:library.filter(r=>r.media_type==='MANGA').map(r=>({...r.payload,media:r.payload?.media||{id:r.anilist_id},status:r.status??r.payload?.status,progress:r.progress??r.payload?.progress,score:r.personal_score??r.payload?.score??0}))}]}}};}
 function thumbnailOf(r){if(typeof r?.thumbnail==='string')return r.thumbnail;const img=r?.panel?.images||r?.images||{};for(const candidate of [img.thumbnail,img.poster_tall]){if(!candidate)continue;const items=candidate.flat?.(3)||[];const selected=items.find(x=>x?.width>=600&&x?.source)||items.find(x=>x?.source);if(selected)return selected.source;}return null;}
-function normalizeWatch(r){const m=r?.panel?.episode_metadata||r?.metadata?.episode_metadata||r?.metadata||{};const id=r.id||r.content_id||r.source_event_id||r.episode_id||r.panel?.id;const seriesId=r.series_id||m.series_id||r.parent_id||r.crunchyroll_series_id||null;const date=r.date||r.date_played||r.watched_at||r.updated_at||null;const duration=r.duration_ms??m.duration_ms??null;const playhead=r.playhead??r.playhead_seconds??null;return {id:id?String(id):'',series_id:seriesId?String(seriesId):null,series:r.series||m.series_title||r.series_title||'',season:r.season??m.season_number??null,episode:r.episode??m.episode_number??null,title:r.title||r.panel?.title||m.title||'',date,playhead:playhead==null?null:Number(playhead),duration_ms:duration==null?null:Number(duration),completed:r.completed===true||r.fully_watched===true,thumbnail:thumbnailOf(r),metadata:!!(r.metadata===true||m.series_title||r.series||r.episode!=null)};}
+function normalizeWatch(r){const m=r?.panel?.episode_metadata||r?.metadata?.episode_metadata||r?.metadata||{};const id=r.id||r.content_id||r.source_event_id||r.episode_id||r.panel?.id;const seriesId=r.series_id||m.series_id||r.parent_id||r.crunchyroll_series_id||null;const date=r.date||r.date_played||r.watched_at||r.updated_at||null;const duration=r.duration_ms??m.duration_ms??null;const playhead=r.playhead??r.playhead_seconds??null;return {id:id?String(id):'',episode_id:r.episode_id??r.content_id??r.panel?.id??null,series_total_episodes:r.series_total_episodes??null,series_id:seriesId?String(seriesId):null,series:r.series||m.series_title||r.series_title||'',season:r.season??m.season_number??null,episode:r.episode??m.episode_number??null,title:r.title||r.panel?.title||m.title||'',date,playhead:playhead==null?null:Number(playhead),duration_ms:duration==null?null:Number(duration),completed:r.completed===true||r.fully_watched===true,thumbnail:thumbnailOf(r),metadata:!!(r.metadata===true||m.series_title||r.series||r.episode!=null)};}
 function watchPayload(){return watch.map(w=>{const p=w.payload||{};const r=normalizeWatch({...p,id:p.id||w.source_event_id,series_id:p.series_id||w.crunchyroll_series_id,date:p.date||w.watched_at,completed:p.completed??w.completed,playhead:p.playhead??w.playhead_seconds,duration_ms:p.duration_ms??w.duration_ms});return r;}).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));}
 async function loadFromDb(){[library,watch]=await Promise.all([rows('library_entries'),rows('watch_events','watched_at')]);}
 async function upsert(table,values,conflict,onProgress){for(let i=0;i<values.length;i+=75){const batch=values.slice(i,i+75);const {error}=await db.from(table).upsert(batch,{onConflict:conflict});if(error)throw Error('Falha no lote '+(Math.floor(i/75)+1)+': '+error.message);onProgress?.(Math.min(i+75,values.length),values.length);}}
@@ -38,14 +38,19 @@ async function chapterCloudReferences(){
   body:'{}'
  });
  const payload=await response.json();
- if(!response.ok)throw Error(payload.error||'Falha ao consultar capítulos');
+ if(!response.ok){
+  if(/permission denied.*chapter_references/i.test(payload.error||''))throw Error('O Supabase ainda não permite consultar o catálogo de capítulos publicados.');
+  throw Error(payload.error||'Falha ao consultar capítulos');
+ }
  const out={};
  for(const [id,r] of Object.entries(payload.references||{})){
   const orig=Number(r.original_chapters)||null,translated=Number(r.translated_chapters)||null;
   out[id]={
    chapter:orig,
+   original_chapters:orig,translated_chapters:translated,
+   original_source:r.original_source,translation_source:r.translation_source,
    source:orig?r.original_source:'Publicação original não confirmada',
-   confidence:orig?'Total de obra concluída':'Não utilizar traduções como total publicado',
+   confidence:orig?'Referência da publicação original':'Publicação original não confirmada',
    checkedAt:r.checked_at,
    mangadex:translated?{chapter:translated,url:r.translation_url}:null,
    mangaupdates:null,
@@ -75,7 +80,7 @@ async function importAniList(file){const text=await file.text(),j=JSON.parse(tex
 async function importCrunchy(file){const j=JSON.parse(await file.text());const data=Array.isArray(j)?j:Array.isArray(j?.data)?j.data:Array.isArray(j?.data?.items)?j.data.items:Array.isArray(j?.items)?j.items:null;if(!data)throw Error('O JSON não contém um histórico Crunchyroll reconhecível.');const mapped=data.map((raw,i)=>{const p=normalizeWatch(raw);if(!p.id)throw Error('Reprodução '+(i+1)+' sem identificador.');return {user_id:account.id,source:'crunchyroll',source_event_id:p.id,crunchyroll_series_id:p.series_id,watched_at:p.date&&Number.isFinite(Date.parse(p.date))?new Date(p.date).toISOString():null,completed:p.completed,playhead_seconds:p.playhead,duration_ms:p.duration_ms==null?null:Math.round(p.duration_ms),payload:p};});const values=[...new Map(mapped.map(x=>[x.source_event_id,x])).values()];await upsert('watch_events',values,'user_id,source,source_event_id',(n,t)=>message('Importando reproduções: '+n+'/'+t));return values.length;}
 function showImport(){const app=$('atlas-private');if(!app||app.hidden)return;const panel=$('atlas-import');panel.hidden=false;['mainContent','crunchyrollview','detailPage','animeDetailPage'].forEach(id=>{const el=$(id);if(el)el.classList.add('hidden')});document.querySelectorAll('.atlas-menu').forEach(x=>x.classList.toggle('active',x.dataset.menu==='importar'));document.querySelectorAll('.atlas-subnav').forEach(x=>x.classList.add('hidden'));window.scrollTo(0,0);}
 function hideImport(){const panel=$('atlas-import');if(panel)panel.hidden=true;}
-async function session(s){if(sessionBusy)return;sessionBusy=true;try{const u=s?.user||null;if(!u){account=null;initializedFor='';$('atlas-private').hidden=true;$('atlas-access').hidden=false;$('atlas-user').textContent='';message('');return;}if(initializedFor===u.id)return;account=u;$('atlas-user').textContent=u.email||'Conta autenticada';$('atlas-access').hidden=true;$('atlas-loading').hidden=false;const saved=await pref('anilist_username',{name:''});username=typeof saved==='string'?saved:(typeof saved?.name==='string'?saved.name:'');$('atlas-username').value=username;await loadFromDb();initializedFor=u.id;$('atlas-loading').hidden=true;$('atlas-private').hidden=false;window.atlasCloud.user=u;window.atlasCloud.anilistUsername=username;window.dispatchEvent(new Event('atlas-cloud-ready'));if(!library.some(r=>r.media_type==='MANGA')&&!watch.length)showImport();}catch(e){message('Falha ao carregar a conta: '+e.message,true);$('atlas-loading').hidden=true;$('atlas-access').hidden=false;}finally{sessionBusy=false;}}
+async function session(s){if(sessionBusy)return;sessionBusy=true;try{const u=s?.user||null;if(!u){account=null;window.atlasCloud.user=null;initializedFor='';$('atlas-private').hidden=true;$('atlas-access').hidden=false;$('atlas-user').textContent='';message('');return;}if(initializedFor===u.id)return;account=u;$('atlas-user').textContent=u.email||'Conta autenticada';$('atlas-access').hidden=true;$('atlas-loading').hidden=false;const saved=await pref('anilist_username',{name:''});username=typeof saved==='string'?saved:(typeof saved?.name==='string'?saved.name:'');$('atlas-username').value=username;await loadFromDb();initializedFor=u.id;$('atlas-loading').hidden=true;$('atlas-private').hidden=false;window.atlasCloud.user=u;window.atlasCloud.anilistUsername=username;window.dispatchEvent(new Event('atlas-cloud-ready'));if(!library.some(r=>r.media_type==='MANGA')&&!watch.length)showImport();}catch(e){message('Falha ao carregar a conta: '+e.message,true);$('atlas-loading').hidden=true;$('atlas-access').hidden=false;}finally{sessionBusy=false;}}
 
 // Preferência visual privada: apenas o proprietário acessa a imagem original.
 async function atlasBannerRead(scope='profile'){
@@ -105,7 +110,23 @@ async function atlasBannerUpload(file,scope='profile'){
  return atlasBannerSave({mode:'upload',path},scope);
 }
 
-window.atlasCloud={fetch:atlasFetch,user:null,anilistUsername:'',bannerRead:atlasBannerRead,bannerSave:atlasBannerSave,bannerUpload:atlasBannerUpload};
+async function animeProgressRead(){
+ if(!account)throw Error('Acesso não autenticado.');
+ const {data,error}=await db.from('user_preferences').select('preference_key,value').eq('user_id',account.id).like('preference_key','anime-progress:%');
+ if(error)throw error;
+ return Object.fromEntries(data.map(row=>[row.preference_key.slice(15),row.value]));
+}
+async function animeProgressSave(id,value){
+ if(!account||typeof id!=='string'||!id||id.length>200)throw Error('Série ou sessão inválida.');
+ const saved={userStatus:value.userStatus==='COMPLETED'?'COMPLETED':null};
+ if(value.confirmed===true&&Number.isInteger(value.season)&&value.season>=0&&Number.isInteger(value.episodes)&&value.episodes>0){
+  Object.assign(saved,{confirmed:true,season:value.season,episodes:value.episodes});
+  if(Number.isSafeInteger(value.anilistId)&&value.anilistId>0)saved.anilistId=value.anilistId;
+ }
+ await setPref('anime-progress:'+id,saved);
+ return saved;
+}
+window.atlasCloud={animeProgressRead,animeProgressSave,fetch:atlasFetch,user:null,anilistUsername:'',bannerRead:atlasBannerRead,bannerSave:atlasBannerSave,bannerUpload:atlasBannerUpload};
 async function init(){if(!cfg.supabaseUrl?.startsWith('https://')||!cfg.supabaseAnonKey){message('Configuração Supabase ausente.',true);return;}try{db=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});const params=new URLSearchParams(location.search);if(params.get('error')){message('Autenticação: '+(params.get('error_description')||params.get('error')),true);history.replaceState({},'',location.pathname);}const {data,error}=await db.auth.getSession();if(error)throw error;await session(data.session);db.auth.onAuthStateChange((event,s)=>{if(event==='SIGNED_IN'||event==='SIGNED_OUT')setTimeout(()=>{if(event==='SIGNED_OUT')location.reload();else session(s);},0)});}catch(e){message('Não foi possível iniciar a autenticação: '+e.message,true);$('atlas-loading').hidden=true;}}
 $('atlas-magic-form').addEventListener('submit',async e=>{e.preventDefault();const input=$('atlas-email'),button=$('atlas-magic-button');button.disabled=true;message('Enviando link de acesso…');try{const {error}=await db.auth.signInWithOtp({email:input.value.trim(),options:{emailRedirectTo:cfg.siteUrl||location.origin+'/',shouldCreateUser:true}});if(error)throw error;$('atlas-magic-form').hidden=true;$('atlas-magic-sent').hidden=false;message('');}catch(e){message('Não foi possível enviar o link: '+e.message,true)}finally{button.disabled=false}});
 $('atlas-magic-again').onclick=()=>{$('atlas-magic-form').hidden=false;$('atlas-magic-sent').hidden=true;message('')};
