@@ -8,7 +8,11 @@
  const collator=new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'});
  const matches=(query,fields)=>{const hay=fold(fields.join(' '));return fold(query).split(/\s+/).filter(Boolean).every(term=>hay.includes(term))};
  const layouts=['compact','large','list'];
- const buttons=(current,attr)=>layouts.map(mode=>'<button type="button" '+attr+'="'+mode+'" aria-pressed="'+(mode===current)+'" aria-label="'+label+'" title="'+label+'" class="'+(mode===current?'active':'')+'">'+{large:'▥',compact:'▦',list:'☷'}[mode]+'</button>').join('');
+ const buttons=(current,attr)=>layouts.map(mode=>{
+  const label={large:'Capas grandes',compact:'Grade compacta',list:'Lista detalhada'}[mode];
+  const icon={large:'▥',compact:'▦',list:'☷'}[mode];
+  return '<button type="button" '+attr+'="'+mode+'" aria-pressed="'+(mode===current)+'" aria-label="'+label+'" title="'+label+'" class="'+(mode===current?'active':'')+'">'+icon+'</button>';
+ }).join('');
  function progress(current,total,complete=false){
   const n=num(current), denominator=positive(total), amount=n===null?null:Math.max(0,n);
   return {amount,total:denominator,complete,caughtUp:!complete&&denominator!==null&&amount!==null&&amount>=denominator,percent:complete?100:amount===null||denominator===null?null:Math.min(100,100*(amount/denominator))};
