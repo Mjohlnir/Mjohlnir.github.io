@@ -100,7 +100,7 @@ try{
  await page.evaluate(async()=>{
   const original=window.atlasCloud.fetch;
   window.atlasCloud.fetch=async(path,options)=>path==='/api/capitulos-fontes'
-   ?new Response(JSON.stringify({1:{original_chapters:390},4:{original_chapters:800}}))
+   ?new Response(JSON.stringify({1:{original_chapters:390},4:{original_chapters:800}}),{headers:{'Content-Type':'application/json'}})
    :original(path,options);
   await atlasRefreshChapterReferences(true);
  });
