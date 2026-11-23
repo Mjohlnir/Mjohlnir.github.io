@@ -113,7 +113,7 @@ try{
  await old.goto('http://127.0.0.1:'+server.address().port+'/before');
  await old.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
  await old.locator('button[data-menu=perfil]').click();
- await old.locator('#profileview .profile-header').waitFor();
+ await old.locator('#profileview > .profile-header').waitFor();
  await old.locator('#profileview').screenshot({path:'artifacts/perfil-antes-desktop.png'});
  await old.locator('button[data-menu=mangas]').click();
  await old.locator('[data-layout=list]').click();
@@ -126,7 +126,7 @@ try{
  const comparison=await browser.newPage({viewport:{width:1820,height:1000}});
  for(const [name,before,after] of [['mangas',oldManga,mangaImage],['animes',oldAnime,animeImage]]){
   const panel=(label,png)=>'<section style="width:50%"><h2>'+label+'</h2><img style="display:block;width:100%" src="data:image/png;base64,'+png.toString('base64')+'"></section>';
-  await comparison.setContent('<main style="margin:0;background:#0b1019;color:white;font:16px system-ui;display:flex;gap:12px;padding:12px;align-items:flex-start">'+panel('Antes · site publicado',before)+panel('Depois · PR #2',after)+'</main>');
+  await comparison.setContent('<main style="margin:0;background:#0b1019;color:white;font:16px system-ui;display:flex;gap:12px;padding:12px;align-items:flex-start">'+panel('Antes · branch main',before)+panel('Depois · restauração de paridade',after)+'</main>');
   await comparison.locator('main').screenshot({path:'artifacts/comparativo-'+name+'.png'});
  }
  await page.locator('button[data-menu=mangas]').click();
