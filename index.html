@@ -566,6 +566,7 @@ async function resolveCovers(gs){
   }catch(e){console.warn('Metadados AniList indisponíveis:',e.message);break}
  }
  resolving=false;
+ if(sort==='score'&&loaded&&root()&&!root().classList.contains('hidden'))render();
 }
 const animeScore=g=>Number(coverCache[g.id]?.averageScore)||0;
 const animeMeta=g=>coverCache[g.id]||{};
