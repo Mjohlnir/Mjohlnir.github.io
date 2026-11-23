@@ -76,7 +76,36 @@ async function importCrunchy(file){const j=JSON.parse(await file.text());const d
 function showImport(){const app=$('atlas-private');if(!app||app.hidden)return;const panel=$('atlas-import');panel.hidden=false;['mainContent','crunchyrollview','detailPage','animeDetailPage'].forEach(id=>{const el=$(id);if(el)el.classList.add('hidden')});document.querySelectorAll('.atlas-menu').forEach(x=>x.classList.toggle('active',x.dataset.menu==='importar'));document.querySelectorAll('.atlas-subnav').forEach(x=>x.classList.add('hidden'));window.scrollTo(0,0);}
 function hideImport(){const panel=$('atlas-import');if(panel)panel.hidden=true;}
 async function session(s){if(sessionBusy)return;sessionBusy=true;try{const u=s?.user||null;if(!u){account=null;initializedFor='';$('atlas-private').hidden=true;$('atlas-access').hidden=false;$('atlas-user').textContent='';message('');return;}if(initializedFor===u.id)return;account=u;$('atlas-user').textContent=u.email||'Conta autenticada';$('atlas-access').hidden=true;$('atlas-loading').hidden=false;const saved=await pref('anilist_username',{name:''});username=typeof saved==='string'?saved:(typeof saved?.name==='string'?saved.name:'');$('atlas-username').value=username;await loadFromDb();initializedFor=u.id;$('atlas-loading').hidden=true;$('atlas-private').hidden=false;window.atlasCloud.user=u;window.atlasCloud.anilistUsername=username;window.dispatchEvent(new Event('atlas-cloud-ready'));if(!library.some(r=>r.media_type==='MANGA')&&!watch.length)showImport();}catch(e){message('Falha ao carregar a conta: '+e.message,true);$('atlas-loading').hidden=true;$('atlas-access').hidden=false;}finally{sessionBusy=false;}}
-window.atlasCloud={fetch:atlasFetch,user:null,anilistUsername:''};
+
+// Preferência visual privada: apenas o proprietário acessa a imagem original.
+async function atlasBannerRead(){
+ if(!account)return {mode:'automatic'};
+ const value=await pref('profile_banner',{mode:'automatic'});
+ if(value?.mode==='upload'&&value.path){
+  const {data,error}=await db.storage.from('atlas-banners').createSignedUrl(value.path,3600);
+  return {...value,url:error?'':data?.signedUrl||''};
+ }
+ return value||{mode:'automatic'};
+}
+async function atlasBannerSave(value){
+ if(!account)throw Error('Faça login');
+ const allowed=['automatic','library','upload'];
+ if(!allowed.includes(value?.mode))throw Error('Modo de banner inválido');
+ await setPref('profile_banner',value);
+ return atlasBannerRead();
+}
+async function atlasBannerUpload(file){
+ if(!account)throw Error('Faça login');
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Use JPG, PNG ou WebP');
+ if(file.size>5*1024*1024)throw Error('A imagem deve ter no máximo 5 MB');
+ const extension=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+ const path=account.id+'/profile-banner.'+extension;
+ const {error}=await db.storage.from('atlas-banners').upload(path,file,{upsert:true,contentType:file.type,cacheControl:'3600'});
+ if(error)throw error;
+ return atlasBannerSave({mode:'upload',path});
+}
+
+window.atlasCloud={fetch:atlasFetch,user:null,anilistUsername:'',bannerRead:atlasBannerRead,bannerSave:atlasBannerSave,bannerUpload:atlasBannerUpload};
 async function init(){if(!cfg.supabaseUrl?.startsWith('https://')||!cfg.supabaseAnonKey){message('Configuração Supabase ausente.',true);return;}try{db=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});const params=new URLSearchParams(location.search);if(params.get('error')){message('Autenticação: '+(params.get('error_description')||params.get('error')),true);history.replaceState({},'',location.pathname);}const {data,error}=await db.auth.getSession();if(error)throw error;await session(data.session);db.auth.onAuthStateChange((event,s)=>{if(event==='SIGNED_IN'||event==='SIGNED_OUT')setTimeout(()=>{if(event==='SIGNED_OUT')location.reload();else session(s);},0)});}catch(e){message('Não foi possível iniciar a autenticação: '+e.message,true);$('atlas-loading').hidden=true;}}
 $('atlas-magic-form').addEventListener('submit',async e=>{e.preventDefault();const input=$('atlas-email'),button=$('atlas-magic-button');button.disabled=true;message('Enviando link de acesso…');try{const {error}=await db.auth.signInWithOtp({email:input.value.trim(),options:{emailRedirectTo:cfg.siteUrl||location.origin+'/',shouldCreateUser:true}});if(error)throw error;$('atlas-magic-form').hidden=true;$('atlas-magic-sent').hidden=false;message('');}catch(e){message('Não foi possível enviar o link: '+e.message,true)}finally{button.disabled=false}});
 $('atlas-magic-again').onclick=()=>{$('atlas-magic-form').hidden=false;$('atlas-magic-sent').hidden=true;message('')};
