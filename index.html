@@ -1155,12 +1155,12 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
   if(scope==='mangas')return (typeof entries!=='undefined'?entries:[]).filter(e=>e.media).map(e=>({id:String(e.media.id),title:e.media.title?.english||e.media.title?.romaji||'Sem título',cover:e.media.bannerImage||e.media.coverImage?.extraLarge||e.media.coverImage?.large||'',score:Number(e.score)||0,views:Number(e.progress)||0})).sort((a,b)=>b.score-a.score||b.views-a.views);
   return (window.atlasAnimeBannerOptions?.()||[]).map(e=>({...e,id:String(e.id)})).sort((a,b)=>b.score-a.score||b.views-a.views);
  }
- let animeFallbackLoading=false,animeFallbackUrl='';
+ let animeFallbackLoading=false,animeFallbackAttempted=false,animeFallbackUrl='';
  async function resolveAnimeFallback(){
-  if(animeFallbackLoading||animeFallbackUrl)return;
+  if(animeFallbackLoading||animeFallbackAttempted||animeFallbackUrl)return;
   const list=options('animes');
   if(!list.length)return;
-  animeFallbackLoading=true;
+  animeFallbackLoading=true;animeFallbackAttempted=true;
   try{
    // Consultar apenas obras presentes na biblioteca; não usar um anime arbitrário.
    const pick=list.find(x=>/frieren|sousou no frieren/i.test(x.title))||list[0];
@@ -1179,7 +1179,7 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  function paint(scope){
   const node=document.getElementById(scope==='mangas'?'atlas-manga-banner':'atlas-anime-banner');if(!node)return;
   const p=cache[scope],items=options(scope),selected=p.mode==='library'?items.find(x=>x.id===String(p.id)):items[0];
-  const image=p.mode==='upload'?p.url:(selected?.cover||scope==='animes'&&p.mode==='automatic'?selected?.cover||animeFallbackUrl:selected?.cover);
+  const image=p.mode==='upload'?p.url:(selected?.cover||(scope==='animes'&&p.mode==='automatic'?animeFallbackUrl:''));
   node.style.setProperty('--atlas-category-art',image?'url('+JSON.stringify(image)+')':'none');
   node.style.setProperty('--atlas-category-position',String(Number(p.position??50))+'%');
   if(scope==='animes'&&p.mode==='automatic'&&!image)resolveAnimeFallback();
