@@ -78,5 +78,19 @@
   return groups.filter(group=>state(group)&&(year==='all'||group.years.has(year))&&matches(query,[group.title]))
    .sort((a,b)=>(sort==='score'?score(b)-score(a):sort==='recent'?latest(b).localeCompare(latest(a)):sort==='count'?b.rows.length-a.rows.length:0)||collator.compare(a.title,b.title));
  }
- globalThis.atlasLibrary={progress,publishedAnime,manga,anime,meter,matches,collator,layouts,buttons,animeLibrary,animeMetadata:new Map()};
+ function parseRatingsBackup(payload,dimensions){
+  const record=value=>value&&typeof value==='object'&&!Array.isArray(value);
+  if(!record(payload)||('ratings' in payload&&payload.version!=null&&payload.version!==1))throw Error('Formato de backup inválido.');
+  const ratings='ratings' in payload?payload.ratings:payload;
+  if(!record(ratings)||!Object.keys(ratings).length)throw Error('O backup não contém avaliações.');
+  return Object.fromEntries(Object.entries(ratings).map(([id,values])=>{
+   if(!/^[1-9]\d*$/.test(id)||!Number.isSafeInteger(Number(id))||!record(values))throw Error('Avaliação inválida no backup.');
+   return [id,Object.fromEntries(Object.entries(values).map(([name,value])=>{
+    const dimension=/^[0-8]$/.test(name)?Number(name):dimensions.indexOf(name);
+    if(dimension<0||dimension>=dimensions.length||!['number','string'].includes(typeof value)||String(value).trim()===''||!Number.isFinite(Number(value))||Number(value)<0||Number(value)>10)throw Error('Nota ou dimensão inválida no backup.');
+    return [String(dimension),Number(value)];
+   }))];
+  }));
+ }
+ globalThis.atlasLibrary={parseRatingsBackup,progress,publishedAnime,manga,anime,meter,matches,collator,layouts,buttons,animeLibrary,animeMetadata:new Map()};
 })();

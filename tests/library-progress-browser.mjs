@@ -9,17 +9,28 @@ const mangas=[
  ['Fullmetal Alchemist',116,'COMPLETED',116,'FINISHED'],
  ['Goodnight Punpun',0,'PLANNING',147,'FINISHED'],
  ['Kingdom',773,'CURRENT',null,'RELEASING']
-].map(([title,progress,status,chapters,publication],i)=>({progress,status,score:0,media:{id:i+1,title:{english:title},format:'MANGA',chapters,status:publication,genres:['Drama']}}));
+].map(([title,progress,status,chapters,publication],i)=>({progress,status,score:i===1?9.5:0,media:{id:i+1,title:{english:title},format:'MANGA',chapters,status:publication,genres:['Drama'],staff:{edges:[{role:'Story & Art',node:{name:{full:i===0?'Autor de teste':'Outro autor'}}}]}}}));
 const anime=[
  {series_id:'done',series:'Árvore Completa',season:1,episode:1,id:'a',date:'2026-01-01',completed:true,metadata:true,series_total_episodes:4},
  {series_id:'active',series:'Ficção em curso',season:1,episode:1,id:'b',date:'2025-02-01',completed:true,metadata:true,series_total_episodes:4},
  {series_id:'active',series:'Ficção em curso',season:1,episode:1,id:'b',date:'2025-03-01',completed:true,metadata:true,series_total_episodes:4},
- {series_id:'unknown',series:'Série sem total',season:1,episode:1,id:'c',date:'2026-03-01',completed:true,metadata:true}
+ {series_id:'unknown',series:'Série sem total',season:1,episode:1,id:'c',date:new Date(Date.now()-86400000).toISOString().slice(0,10),completed:true,metadata:true}
 ];
-const responses={'/api/library':{data:{data:{MediaListCollection:{lists:[{entries:mangas}]}}},updated:'fixture'},'historico_crunchyroll.json':anime};
+const responses={'/api/versao':{version:'test'},'/api/atividades':{activities:[{id:20,media:{id:1,type:'MANGA',title:{english:'Berserk'}},status:'read chapter',createdAt:Math.floor(Date.now()/1000)-3600}]},'/api/library':{data:{data:{MediaListCollection:{lists:[{entries:mangas}]}}},updated:'fixture'},'historico_crunchyroll.json':anime};
 const cloud=`
 const responses=${JSON.stringify(responses)};
-window.atlasCloud={user:{id:'fixture'},fetch:async path=>new Response(JSON.stringify(responses[path]??{}),{headers:{'Content-Type':'application/json'}}),
+window.atlasCloud={user:{id:'fixture'},fetch:async (path,options)=>{
+  if(path==='/api/avaliacoes'){
+   const ratings=JSON.parse(localStorage.getItem('test-server-ratings')||'{}');
+   if(options?.method==='POST'){
+    if(window.failRatingSave)return Response.json({error:'offline'},{status:503});
+    localStorage.setItem('test-server-ratings',JSON.stringify({...ratings,...JSON.parse(options.body)}));
+    return Response.json({ok:true});
+   }
+   return Response.json(ratings);
+  }
+  return Response.json(responses[path]??{});
+ },
  animeAniListRead:async()=>({entries:[{anilist_id:55,status:'CURRENT',progress:2,payload:{media:{title:{english:'Anime do AniList'},status:'RELEASING',nextAiringEpisode:{episode:5}}}}],lastSuccess:'2026-01-01T12:00:00Z'}),
  animeProgressRead:async()=>({done:{userStatus:'COMPLETED'}})};
 document.getElementById('atlas-private').hidden=false;
@@ -30,17 +41,54 @@ const beforeHtml=execFileSync('git',['show','origin/main:index.html']);
 const server=createServer(async(req,res)=>{
  const path=new URL(req.url,'http://127.0.0.1').pathname;
  if(path==='/config.js'||path==='/atlas-cloud.js'){res.writeHead(200,{'Content-Type':'text/javascript'}).end(path==='/atlas-cloud.js'?cloud:'');return;}
- if(path!=='/'&&path!=='/before'&&path!=='/atlas-library-shared.js'){res.writeHead(404).end();return;}
- res.writeHead(200,{'Content-Type':path!=='/atlas-library-shared.js'?'text/html; charset=utf-8':'text/javascript; charset=utf-8'}).end(path==='/before'?beforeHtml:await readFile(path==='/'?'index.html':'atlas-library-shared.js'));
+ if(!['/','/before','/atlas-library-shared.js','/atlas-dashboard.js','/atlas-dashboard.css'].includes(path)){res.writeHead(404).end();return;}
+ res.writeHead(200,{'Content-Type':path.endsWith('.css')?'text/css':path.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8'}).end(path==='/before'?beforeHtml:await readFile(path==='/'?'index.html':path.slice(1)));
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch();
 try{
- const page=await browser.newPage({viewport:{width:900,height:1000}});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});
  page.setDefaultTimeout(12000);
- await page.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
+ await page.route('https://**',route=>{
+  const lookup=route.request().postData()?.includes('"id":55');
+  const data=lookup?{Media:{id:55,title:{english:'Anime do AniList'},description:'Sinopse de teste',recommendations:{nodes:[{mediaRecommendation:{id:56,title:{english:'Recomendação de teste'}}}]}}}:{};
+  return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data})});
+ });
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
+ await page.locator('button[data-menu=perfil]').click();
+ const heat=page.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap');
+ await heat.waitFor();
+ assert.equal(await heat.locator('button').count(),91);
+ const columns=await page.locator('.profile-layout').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
+ assert.equal(columns,3);
+ const activeDay=heat.locator('.atlas-heat-4');
+ await activeDay.click();
+ assert.match(await page.locator('#profileview .atlas-stat-detail .atlas-dashboard-day').textContent(),/1 evento/);
+ await activeDay.press('ArrowLeft');
+ assert.match(await page.locator('#profileview .atlas-stat-detail .atlas-dashboard-day').textContent(),/0 eventos/);
+ assert.equal(await heat.locator('button[tabindex="0"]').count(),1);
+ await mkdir('artifacts',{recursive:true});
+ await page.locator('#profileview').screenshot({path:'artifacts/perfil-mangas-desktop.png'});
+ await page.locator('#animeProfile .atlas-dashboard-heatmap').waitFor();
+ await page.locator('#animeProfile').screenshot({path:'artifacts/perfil-animes-desktop.png'});
+ const mobile=await browser.newPage({viewport:{width:390,height:844}});
+ await mobile.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
+ await mobile.goto('http://127.0.0.1:'+server.address().port);
+ await mobile.locator('button[data-menu=perfil]').click();
+ await mobile.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap').waitFor();
+ assert.equal(await mobile.locator('.profile-layout').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),1);
+ await mobile.locator('#profileview').screenshot({path:'artifacts/perfil-mangas-mobile.png'});
+ await mobile.locator('#animeProfile').screenshot({path:'artifacts/perfil-animes-mobile.png'});
+ await mobile.evaluate(async()=>{
+  const read=window.atlasCloud.fetch;
+  window.atlasCloud.fetch=(path,options)=>path==='/api/atividades/atualizar'
+   ?Promise.reject(new Error('Serviço indisponível no teste')):read(path,options);
+ });
+ await mobile.locator('#refreshActivity').click();
+ await mobile.locator('#profileview .atlas-stat-detail .feed-error').getByText('Serviço indisponível no teste').waitFor();
+ assert.equal(await mobile.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap').count(),0);
+ await mobile.close();
  await page.locator('button[data-menu=mangas]').click();
  const manga=title=>page.locator('#grid .manga').filter({hasText:title});
  const get=(card)=>card.locator('[role=progressbar]').getAttribute('aria-valuenow');
@@ -53,6 +101,9 @@ try{
  await page.locator('#status').selectOption({label:'Lendo'});
  assert.equal(await page.locator('#grid .manga').count(),2);
  await page.locator('#resetFilters').click();
+ await page.locator('#authorFilter').selectOption('Autor de teste');
+ assert.equal(await page.locator('#grid .manga').count(),1);
+ await page.locator('#resetFilters').click();
  await page.locator('#sort').selectOption('title');
  assert.match(await page.locator('#grid .manga').first().innerText(),/Berserk/);
  await mkdir('artifacts',{recursive:true});
@@ -62,6 +113,15 @@ try{
  const aniListEntry=page.locator('#atlas-anilist-anime').getByText('Anime do AniList');
  await aniListEntry.waitFor();
  assert.match(await page.locator('#atlas-anilist-anime [role=progressbar]').getAttribute('aria-label'),/2\/4.*50%/);
+ await page.getByRole('searchbox',{name:'Buscar na coleção AniList'}).fill('sem correspondência');
+ assert.equal(await page.locator('#atlas-anilist-anime .atlas-ranked-card').count(),0);
+ await page.getByRole('searchbox',{name:'Buscar na coleção AniList'}).fill('anime do anilist');
+ assert.equal(await page.locator('#atlas-anilist-anime .atlas-ranked-card').count(),1);
+ await page.locator('[data-anilist-detail="55"]').click();
+ await page.locator('#animeDetailPage').getByText('Recomendação de teste').waitFor();
+ await page.locator('#animeDetailPage').screenshot({path:'artifacts/dossie-anilist-desktop.png'});
+ await page.locator('#animeBack').click();
+ assert.ok(await page.locator('[data-anilist-detail="55"]').isVisible());
  const cards=page.locator('.cr-anime-card');
  await cards.first().waitFor();
  const series=title=>cards.filter({hasText:title});
@@ -82,10 +142,13 @@ try{
  await page.locator('[data-anime-layout=large]').click();
  const animeImage=await page.locator('.cr-anime-grid').screenshot({path:'artifacts/animes.png'});
 
- const old=await browser.newPage({viewport:{width:900,height:1000}});
+ const old=await browser.newPage({viewport:{width:1440,height:1000}});
  await old.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
  await old.goto('http://127.0.0.1:'+server.address().port+'/before');
  await old.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
+ await old.locator('button[data-menu=perfil]').click();
+ await old.locator('#profileview > .profile-header').waitFor();
+ await old.locator('#profileview').screenshot({path:'artifacts/perfil-antes-desktop.png'});
  await old.locator('button[data-menu=mangas]').click();
  await old.locator('[data-layout=list]').click();
  await old.locator('#sort').selectOption('title');
@@ -97,7 +160,7 @@ try{
  const comparison=await browser.newPage({viewport:{width:1820,height:1000}});
  for(const [name,before,after] of [['mangas',oldManga,mangaImage],['animes',oldAnime,animeImage]]){
   const panel=(label,png)=>'<section style="width:50%"><h2>'+label+'</h2><img style="display:block;width:100%" src="data:image/png;base64,'+png.toString('base64')+'"></section>';
-  await comparison.setContent('<main style="margin:0;background:#0b1019;color:white;font:16px system-ui;display:flex;gap:12px;padding:12px;align-items:flex-start">'+panel('Antes · site publicado',before)+panel('Depois · PR #2',after)+'</main>');
+  await comparison.setContent('<main style="margin:0;background:#0b1019;color:white;font:16px system-ui;display:flex;gap:12px;padding:12px;align-items:flex-start">'+panel('Antes · branch main',before)+panel('Depois · restauração de paridade',after)+'</main>');
   await comparison.locator('main').screenshot({path:'artifacts/comparativo-'+name+'.png'});
  }
  await page.locator('button[data-menu=mangas]').click();
@@ -123,5 +186,25 @@ try{
  await page.locator('#catalogview [data-chapter-refresh-result]').getByText(/6 obras verificadas/).waitFor();
  assert.equal(await page.evaluate(()=>window.atlasChapterRequests),2);
  assert.match(await manga('Berserk').innerText(),/364\/400.*91%/);
- console.log('Chromium: progresso, filtros, ordenação e modos nas duas bibliotecas.');
+ await manga('Berserk').click();
+ assert.equal(await page.locator('#modalbody [data-dim]').count(),9);
+ await page.locator('#modalbody [data-dim="0"]').fill('8.5');
+ await page.evaluate(()=>{window.failRatingSave=true;});
+ await page.locator('#save').click();
+ await page.locator('#atlas-cloud-message').getByText(/Não foi possível salvar a avaliação/).waitFor();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('test-server-ratings')),null);
+ await page.evaluate(()=>{window.failRatingSave=false;});
+ await page.locator('#save').click();
+ await page.locator('#criticalavg').getByText(/8.5/).waitFor();
+ await page.reload();
+ await page.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
+ await page.locator('button[data-menu=mangas]').click();
+ await manga('Berserk').click();
+ assert.equal(await page.locator('#modalbody [data-dim="0"]').inputValue(),'8.5');
+ assert.match(await page.locator('#criticalavg').textContent(),/8.5/);
+ await page.locator('#fullDetails').click();
+ await page.locator('#detailPage').getByRole('heading',{name:'Berserk',exact:true}).waitFor();
+ assert.match(await page.locator('#detailPage [role=progressbar]').getAttribute('aria-label'),/364\/400.*91%.*original/);
+ await page.locator('#detailPage').screenshot({path:'artifacts/dossie-manga-desktop.png'});
+ console.log('Chromium: gráficos, bibliotecas, progresso e recuperação de avaliações com API simulada.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
