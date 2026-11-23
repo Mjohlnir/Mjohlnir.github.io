@@ -49,7 +49,11 @@ const browser=await chromium.launch();
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
  page.setDefaultTimeout(12000);
- await page.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
+ await page.route('https://**',route=>{
+  const lookup=route.request().postData()?.includes('"id":55');
+  const data=lookup?{Media:{id:55,title:{english:'Anime do AniList'},description:'Sinopse de teste',recommendations:{nodes:[{mediaRecommendation:{id:56,title:{english:'Recomendação de teste'}}}]}}}:{};
+  return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data})});
+ });
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
  await page.locator('button[data-menu=perfil]').click();
@@ -113,6 +117,11 @@ try{
  assert.equal(await page.locator('#atlas-anilist-anime .atlas-ranked-card').count(),0);
  await page.getByRole('searchbox',{name:'Buscar na coleção AniList'}).fill('anime do anilist');
  assert.equal(await page.locator('#atlas-anilist-anime .atlas-ranked-card').count(),1);
+ await page.locator('[data-anilist-detail="55"]').click();
+ await page.locator('#animeDetailPage').getByText('Recomendação de teste').waitFor();
+ await page.locator('#animeDetailPage').screenshot({path:'artifacts/dossie-anilist-desktop.png'});
+ await page.locator('#animeBack').click();
+ assert.ok(await page.locator('[data-anilist-detail="55"]').isVisible());
  const cards=page.locator('.cr-anime-card');
  await cards.first().waitFor();
  const series=title=>cards.filter({hasText:title});
@@ -193,5 +202,9 @@ try{
  await manga('Berserk').click();
  assert.equal(await page.locator('#modalbody [data-dim="0"]').inputValue(),'8.5');
  assert.match(await page.locator('#criticalavg').textContent(),/8.5/);
+ await page.locator('#fullDetails').click();
+ await page.locator('#detailPage').getByRole('heading',{name:'Berserk',exact:true}).waitFor();
+ assert.match(await page.locator('#detailPage [role=progressbar]').getAttribute('aria-label'),/364\/400.*91%.*original/);
+ await page.locator('#detailPage').screenshot({path:'artifacts/dossie-manga-desktop.png'});
  console.log('Chromium: gráficos, bibliotecas, progresso e recuperação de avaliações com API simulada.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
