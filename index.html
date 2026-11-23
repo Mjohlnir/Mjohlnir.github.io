@@ -635,6 +635,7 @@ async function loadTopAnime(){
   if(!res.ok)throw Error('AniList HTTP '+res.status);
   const data=await res.json();if(data.errors?.length)throw Error(data.errors[0].message);
   topCache=data.data?.Page?.media||[];
+  window.atlasAnimeTopList=topCache;
   paintTopAnime();window.atlasCategoryBannerRender?.('animes');
  }catch(e){const el=root()?.querySelector('#atlas-anime-top');if(el)el.innerHTML='<p class="muted">Ranking do AniList temporariamente indisponível.</p>'}finally{topLoading=false}
 }
@@ -1179,7 +1180,7 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  function paint(scope){
   const node=document.getElementById(scope==='mangas'?'atlas-manga-banner':'atlas-anime-banner');if(!node)return;
   const p=cache[scope],items=options(scope),selected=p.mode==='library'?items.find(x=>x.id===String(p.id)):items[0];
-  const topFrieren=scope==='animes'&&p.mode==='automatic'&&typeof topCache!=='undefined'&&Array.isArray(topCache)?topCache.find(m=>/frieren/i.test([m.title?.english,m.title?.romaji].join(' '))):null;
+  const topFrieren=scope==='animes'&&p.mode==='automatic'?(window.atlasAnimeTopList||[]).find(m=>/frieren/i.test([m.title?.english,m.title?.romaji].join(' '))):null;
   const rankedFallback=topFrieren?.bannerImage||topFrieren?.coverImage?.large||'';
   const image=p.mode==='upload'?p.url:(selected?.cover||(scope==='animes'&&p.mode==='automatic'?(rankedFallback||animeFallbackUrl):''));
   node.style.setProperty('--atlas-category-art',image?'url('+JSON.stringify(image)+')':'none');
