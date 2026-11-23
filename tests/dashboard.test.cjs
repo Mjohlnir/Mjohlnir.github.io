@@ -32,7 +32,8 @@ test('histórico com 3.180 eventos preserva replays na contagem',()=>{
 
 test('backup v21 mantém dimensões e recusa conteúdo inválido',()=>{
  const {parseRatingsBackup}=globalThis.atlasLibrary;
- assert.deepEqual(parseRatingsBackup({version:1,ratings:{42:{Arte:'9.5',História:0}}},['Arte','História']),{42:{Arte:9.5,História:0}});
+ assert.deepEqual(parseRatingsBackup({version:1,ratings:{42:{Arte:'9.5',História:0}}},['Arte','História']),{42:{0:9.5,1:0}});
+ assert.deepEqual(parseRatingsBackup({version:1,ratings:{42:{0:9,1:0}}},['Arte','História']),{42:{0:9,1:0}});
  for(const bad of [{42:{Arte:null}},{42:{Arte:11}},{42:{Extra:9}},{version:2,ratings:{42:{Arte:10}}}]){
   assert.throws(()=>parseRatingsBackup(bad,['Arte']));
  }

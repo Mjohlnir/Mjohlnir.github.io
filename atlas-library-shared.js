@@ -83,12 +83,12 @@
   if(!record(payload)||('ratings' in payload&&payload.version!=null&&payload.version!==1))throw Error('Formato de backup inválido.');
   const ratings='ratings' in payload?payload.ratings:payload;
   if(!record(ratings)||!Object.keys(ratings).length)throw Error('O backup não contém avaliações.');
-  const allowed=new Set(dimensions);
   return Object.fromEntries(Object.entries(ratings).map(([id,values])=>{
    if(!/^[1-9]\d*$/.test(id)||!Number.isSafeInteger(Number(id))||!record(values))throw Error('Avaliação inválida no backup.');
    return [id,Object.fromEntries(Object.entries(values).map(([name,value])=>{
-    if(!allowed.has(name)||!['number','string'].includes(typeof value)||String(value).trim()===''||!Number.isFinite(Number(value))||Number(value)<0||Number(value)>10)throw Error('Nota ou dimensão inválida no backup.');
-    return [name,Number(value)];
+    const dimension=/^[0-8]$/.test(name)?Number(name):dimensions.indexOf(name);
+    if(dimension<0||dimension>=dimensions.length||!['number','string'].includes(typeof value)||String(value).trim()===''||!Number.isFinite(Number(value))||Number(value)<0||Number(value)>10)throw Error('Nota ou dimensão inválida no backup.');
+    return [String(dimension),Number(value)];
    }))];
   }));
  }

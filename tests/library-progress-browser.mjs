@@ -19,7 +19,18 @@ const anime=[
 const responses={'/api/versao':{version:'test'},'/api/atividades':{activities:[{id:20,media:{id:1,type:'MANGA',title:{english:'Berserk'}},status:'read chapter',createdAt:Math.floor(Date.now()/1000)-3600}]},'/api/library':{data:{data:{MediaListCollection:{lists:[{entries:mangas}]}}},updated:'fixture'},'historico_crunchyroll.json':anime};
 const cloud=`
 const responses=${JSON.stringify(responses)};
-window.atlasCloud={user:{id:'fixture'},fetch:async path=>new Response(JSON.stringify(responses[path]??{}),{headers:{'Content-Type':'application/json'}}),
+window.atlasCloud={user:{id:'fixture'},fetch:async (path,options)=>{
+  if(path==='/api/avaliacoes'){
+   const ratings=JSON.parse(localStorage.getItem('test-server-ratings')||'{}');
+   if(options?.method==='POST'){
+    if(window.failRatingSave)return Response.json({error:'offline'},{status:503});
+    localStorage.setItem('test-server-ratings',JSON.stringify({...ratings,...JSON.parse(options.body)}));
+    return Response.json({ok:true});
+   }
+   return Response.json(ratings);
+  }
+  return Response.json(responses[path]??{});
+ },
  animeAniListRead:async()=>({entries:[{anilist_id:55,status:'CURRENT',progress:2,payload:{media:{title:{english:'Anime do AniList'},status:'RELEASING',nextAiringEpisode:{episode:5}}}}],lastSuccess:'2026-01-01T12:00:00Z'}),
  animeProgressRead:async()=>({done:{userStatus:'COMPLETED'}})};
 document.getElementById('atlas-private').hidden=false;
@@ -166,5 +177,21 @@ try{
  await page.locator('#catalogview [data-chapter-refresh-result]').getByText(/6 obras verificadas/).waitFor();
  assert.equal(await page.evaluate(()=>window.atlasChapterRequests),2);
  assert.match(await manga('Berserk').innerText(),/364\/400.*91%/);
- console.log('Chromium: progresso, filtros, ordenação e modos nas duas bibliotecas.');
+ await manga('Berserk').click();
+ assert.equal(await page.locator('#modalbody [data-dim]').count(),9);
+ await page.locator('#modalbody [data-dim="0"]').fill('8.5');
+ await page.evaluate(()=>{window.failRatingSave=true;});
+ await page.locator('#save').click();
+ await page.locator('#atlas-cloud-message').getByText(/Não foi possível salvar a avaliação/).waitFor();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('test-server-ratings')),null);
+ await page.evaluate(()=>{window.failRatingSave=false;});
+ await page.locator('#save').click();
+ await page.locator('#criticalavg').getByText(/8.5/).waitFor();
+ await page.reload();
+ await page.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
+ await page.locator('button[data-menu=mangas]').click();
+ await manga('Berserk').click();
+ assert.equal(await page.locator('#modalbody [data-dim="0"]').inputValue(),'8.5');
+ assert.match(await page.locator('#criticalavg').textContent(),/8.5/);
+ console.log('Chromium: gráficos, bibliotecas, progresso e recuperação de avaliações com API simulada.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
