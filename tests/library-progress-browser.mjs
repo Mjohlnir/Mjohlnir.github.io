@@ -96,5 +96,15 @@ try{
   await comparison.setContent('<main style="margin:0;background:#0b1019;color:white;font:16px system-ui;display:flex;gap:12px;padding:12px;align-items:flex-start">'+panel('Antes · site publicado',before)+panel('Depois · PR #2',after)+'</main>');
   await comparison.locator('main').screenshot({path:'artifacts/comparativo-'+name+'.png'});
  }
+ await page.locator('button[data-menu=mangas]').click();
+ await page.evaluate(async()=>{
+  const original=window.atlasCloud.fetch;
+  window.atlasCloud.fetch=async(path,options)=>path==='/api/capitulos-fontes'
+   ?new Response(JSON.stringify({1:{original_chapters:390},4:{original_chapters:800}}))
+   :original(path,options);
+  await atlasRefreshChapterReferences(true);
+ });
+ assert.match(await manga('Berserk').innerText(),/364\/390.*93,33%/);
+ assert.match(await manga('Kingdom').innerText(),/773\/800.*96,63%/);
  console.log('Chromium: progresso, filtros, ordenação e modos nas duas bibliotecas.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
