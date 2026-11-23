@@ -34,8 +34,14 @@
    [positive(source.chapter),source.source?'Referência publicada · '+source.source:'Referência publicada'],
    [translated,'Capítulos publicados · tradução']
   ];
-  const selected=candidates.find(([count])=>count!==null);
-  return {...progress(entry?.progress,selected?.[0],entry?.status==='COMPLETED'),reference:selected?.[1]};
+  const read=num(entry?.progress);
+  const complete=entry?.status==='COMPLETED';
+  const isPublishedClosed=media.status==='FINISHED';
+  const known=candidates.filter(([count])=>count!==null);
+  const selected=known.find(([count])=>complete||isPublishedClosed||read===null||count>=read);
+  const insufficient=!selected&&known[0];
+  const note=insufficient?insufficient[1]+': '+format.format(insufficient[0])+' · abaixo do progresso registrado':null;
+  return {...progress(entry?.progress,selected?.[0],complete),reference:selected?.[1],note};
  }
  function anime(rows,metadata={}){
   const episodes=new Set();
@@ -56,11 +62,11 @@
   return {...progress(episodes.size,unidentified?null:total,complete),unidentified,reference:hasScope?'Temporada '+metadata.season+' · publicação AniList':total?'Episódios publicados na série':null};
  }
  function meter(model,{unit,status=''}){
-  const {amount,total,percent,complete,caughtUp,unidentified,reference}=model;
+  const {amount,total,percent,complete,caughtUp,unidentified,reference,note}=model;
   const known=percent!==null;
   const absolute=amount===null?'Progresso não informado':format.format(amount)+(total!==null?'/'+format.format(total):'')+' '+unit;
   const caption=[status||(complete?'Concluído':''),absolute,known?format.format(percent)+'%':'total não confirmado',
-   reference,unidentified?'há conclusões sem identificação':''].filter(Boolean).join(' · ');
+   reference,note,unidentified?'há conclusões sem identificação':''].filter(Boolean).join(' · ');
   const attributes=known?' aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+percent+'"':'';
   const state=complete?'finished':caughtUp?'caught-up':'ongoing';
   return '<div class="progress-wrap atlas-media-progress" data-progress-state="'+(known?'known':'unknown')+'"><div class="profile-progress '+state+(known?'':' unverified')+'" role="progressbar" aria-label="'+escape(caption)+'"'+attributes+'>'+(known?'<i style="width:'+percent+'%"></i>':'')+'</div><span class="progress-caption">'+escape(caption)+'</span></div>';

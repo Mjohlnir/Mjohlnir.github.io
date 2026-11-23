@@ -64,3 +64,12 @@ test('usa episódios já exibidos em vez do total planejado de anime',()=>{
  const rows=[{completed:true,season:1,episode:1},{completed:true,season:1,episode:1}];
  assert.equal(anime(rows,{confirmed:true,season:1,episodes:count}).percent,100*(1/9));
 });
+
+test('tradução abaixo da leitura não enche a barra de uma obra em andamento',()=>{
+ const ongoing={progress:96,status:'CURRENT',media:{status:'RELEASING'}};
+ const stale=manga(ongoing,null,{translated_chapters:3});
+ assert.equal(stale.percent,null);
+ assert.match(meter(stale,{unit:'capítulos lidos'}),/96 capítulos lidos.*3.*abaixo/);
+ assert.equal(manga(ongoing,null,{original_chapters:90,translated_chapters:100}).percent,96);
+ assert.equal(manga({...ongoing,status:'COMPLETED'},null,{translated_chapters:3}).percent,100);
+});
