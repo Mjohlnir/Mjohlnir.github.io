@@ -14,7 +14,7 @@ const anime=[
  {series_id:'done',series:'Árvore Completa',season:1,episode:1,id:'a',date:'2026-01-01',completed:true,metadata:true,series_total_episodes:4},
  {series_id:'active',series:'Ficção em curso',season:1,episode:1,id:'b',date:'2025-02-01',completed:true,metadata:true,series_total_episodes:4},
  {series_id:'active',series:'Ficção em curso',season:1,episode:1,id:'b',date:'2025-03-01',completed:true,metadata:true,series_total_episodes:4},
- {series_id:'unknown',series:'Série sem total',season:1,episode:1,id:'c',date:'2026-03-01',completed:true,metadata:true}
+ {series_id:'unknown',series:'Série sem total',season:1,episode:1,id:'c',date:new Date(Date.now()-86400000).toISOString().slice(0,10),completed:true,metadata:true}
 ];
 const responses={'/api/versao':{version:'test'},'/api/atividades':{activities:[{id:20,media:{id:1,type:'MANGA',title:{english:'Berserk'}},status:'read chapter',createdAt:Math.floor(Date.now()/1000)-3600}]},'/api/library':{data:{data:{MediaListCollection:{lists:[{entries:mangas}]}}},updated:'fixture'},'historico_crunchyroll.json':anime};
 const cloud=`
@@ -50,6 +50,9 @@ try{
  const activeDay=heat.locator('.atlas-heat-4');
  await activeDay.click();
  assert.match(await page.locator('#profileview .atlas-stat-detail .atlas-dashboard-day').textContent(),/1 evento/);
+ await activeDay.press('ArrowLeft');
+ assert.match(await page.locator('#profileview .atlas-stat-detail .atlas-dashboard-day').textContent(),/0 eventos/);
+ assert.equal(await heat.locator('button[tabindex="0"]').count(),1);
  await mkdir('artifacts',{recursive:true});
  await page.locator('#profileview').screenshot({path:'artifacts/perfil-mangas-desktop.png'});
  await page.locator('#animeProfile .atlas-dashboard-heatmap').waitFor();

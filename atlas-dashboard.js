@@ -54,7 +54,7 @@
    '<div class="atlas-dashboard-heatmap" role="group" aria-label="Atividades nos últimos 91 dias">'+data.cells.map(cell=>{
     const label=calendarDate.format(cell.date)+' · '+number.format(cell.count)+' '+(cell.count===1?'evento':'eventos');
     const level=cell.count?Math.ceil(4*cell.count/maximum):0;
-    return '<button type="button" data-atlas-heat-day="'+label+'" class="atlas-heat-'+level+'" title="'+label+'" aria-label="'+label+'"></button>';
+    return '<button type="button" data-atlas-heat-day="'+label+'" tabindex="'+(cell===data.cells.at(-1)?'0':'-1')+'" class="atlas-heat-'+level+'" title="'+label+'" aria-label="'+label+'"></button>';
    }).join('')+'</div><div class="atlas-dashboard-legend" aria-hidden="true">Menos '+[0,1,2,3,4].map(level=>'<i class="atlas-heat-'+level+'"></i>').join('')+' Mais</div>'+
    '<p class="atlas-dashboard-day muted mini" role="status">Selecione um dia para ver a contagem.</p>'+
    '<h4 class="activity-subtitle">Atividades por dia da semana</h4>'+bars(data.weekdays,weekdayLabels,'week')+
@@ -68,8 +68,23 @@
   return total?bars(counts,counts.map((_,i)=>10-i),'grade')+'<p class="muted mini">'+number.format(total)+' obras avaliadas · escala 1–10</p>':'<p class="muted mini">Nenhuma obra avaliada.</p>';
  }
  function bind(root){
-  root.querySelectorAll('[data-atlas-heat-day]').forEach(button=>button.onclick=()=>{
-   button.closest('section').querySelector('.atlas-dashboard-day').textContent=button.dataset.atlasHeatDay;
+  root.querySelectorAll('.atlas-dashboard-heatmap').forEach(map=>{
+   const days=[...map.querySelectorAll('button')];
+   const selected=map.closest('section').querySelector('.atlas-dashboard-day');
+   function select(day){
+    for(const button of days)button.tabIndex=button===day?0:-1;
+    selected.textContent=day.dataset.atlasHeatDay;
+   }
+   map.onclick=event=>{const day=event.target.closest('[data-atlas-heat-day]');if(day)select(day);};
+   map.onkeydown=event=>{
+    const index=days.indexOf(event.target),end=days.length-1;
+    const next={ArrowLeft:index-7,ArrowRight:index+7,ArrowUp:index-1,ArrowDown:index+1,Home:0,End:end}[event.key];
+    if(index<0||next===undefined)return;
+    event.preventDefault();
+    const day=days[Math.min(end,Math.max(0,next))];
+    select(day);
+    day.focus();
+   };
   });
  }
  return {summarize,renderActivity,renderGrades,bind};
