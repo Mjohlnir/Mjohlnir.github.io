@@ -583,6 +583,9 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  #atlas-private .profile-row-secondary .profile-row-meta small{font-size:9px}
 
  #atlas-private .cr-page{padding:12px 0}
+ #atlas-private .cr-hero{padding:10px 0 14px}
+ #atlas-private .cr-hero h1{font-size:clamp(28px,8vw,36px);line-height:1.12}
+ #atlas-private .atlas-showcase{margin:18px 0 24px}
  #atlas-private .cr-anime-grid{grid-template-columns:minmax(0,1fr)}
  #atlas-private .cr-kpis{gap:8px}
  #atlas-private .cr-kpis>div{padding:12px;min-width:0}
@@ -621,6 +624,10 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
 }
 @media(max-width:360px){
  #atlas-private .logo{font-size:16px!important}
+ #atlas-private .controls{grid-template-columns:minmax(0,1fr)}
+ #atlas-private .controls input{grid-column:auto}
+ #atlas-private .extra-filters{grid-template-columns:minmax(0,1fr)}
+ #atlas-private .reset-filters{grid-column:auto}
  #atlas-private .catalog-compact{grid-template-columns:repeat(2,minmax(0,1fr))}
  #atlas-private .atlas-season-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  #atlas-private .profile-controls{grid-template-columns:1fr}
