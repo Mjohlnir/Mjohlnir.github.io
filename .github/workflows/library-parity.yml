@@ -1,9 +1,9 @@
 name: Atlas — regressão das bibliotecas
 on:
   push:
-    branches: [feat/restore-python-site-parity]
+    branches: [feat/restore-python-site-parity, feat/atlas-final-site-parity]
   pull_request:
-    paths: ['index.html','atlas-cloud.js','atlas-library-shared.js','tests/**','.github/workflows/library-parity.yml']
+    paths: ['index.html','atlas-cloud.js','atlas-library-shared.js','atlas-dashboard.js','atlas-dashboard.css','tests/**','.github/workflows/library-parity.yml']
 permissions:
   contents: read
 jobs:
@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/library-progress.cjs
+      - run: node --test tests/library-progress.cjs tests/dashboard.test.cjs
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 7

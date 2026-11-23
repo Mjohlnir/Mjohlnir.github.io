@@ -9,14 +9,14 @@ const mangas=[
  ['Fullmetal Alchemist',116,'COMPLETED',116,'FINISHED'],
  ['Goodnight Punpun',0,'PLANNING',147,'FINISHED'],
  ['Kingdom',773,'CURRENT',null,'RELEASING']
-].map(([title,progress,status,chapters,publication],i)=>({progress,status,score:0,media:{id:i+1,title:{english:title},format:'MANGA',chapters,status:publication,genres:['Drama']}}));
+].map(([title,progress,status,chapters,publication],i)=>({progress,status,score:i===1?9.5:0,media:{id:i+1,title:{english:title},format:'MANGA',chapters,status:publication,genres:['Drama'],staff:{edges:[{role:'Story & Art',node:{name:{full:i===0?'Autor de teste':'Outro autor'}}}]}}}));
 const anime=[
  {series_id:'done',series:'Árvore Completa',season:1,episode:1,id:'a',date:'2026-01-01',completed:true,metadata:true,series_total_episodes:4},
  {series_id:'active',series:'Ficção em curso',season:1,episode:1,id:'b',date:'2025-02-01',completed:true,metadata:true,series_total_episodes:4},
  {series_id:'active',series:'Ficção em curso',season:1,episode:1,id:'b',date:'2025-03-01',completed:true,metadata:true,series_total_episodes:4},
  {series_id:'unknown',series:'Série sem total',season:1,episode:1,id:'c',date:'2026-03-01',completed:true,metadata:true}
 ];
-const responses={'/api/library':{data:{data:{MediaListCollection:{lists:[{entries:mangas}]}}},updated:'fixture'},'historico_crunchyroll.json':anime};
+const responses={'/api/versao':{version:'test'},'/api/atividades':{activities:[{id:20,media:{id:1,type:'MANGA',title:{english:'Berserk'}},status:'read chapter',createdAt:Math.floor(Date.now()/1000)-3600}]},'/api/library':{data:{data:{MediaListCollection:{lists:[{entries:mangas}]}}},updated:'fixture'},'historico_crunchyroll.json':anime};
 const cloud=`
 const responses=${JSON.stringify(responses)};
 window.atlasCloud={user:{id:'fixture'},fetch:async path=>new Response(JSON.stringify(responses[path]??{}),{headers:{'Content-Type':'application/json'}}),
@@ -30,8 +30,8 @@ const beforeHtml=execFileSync('git',['show','origin/main:index.html']);
 const server=createServer(async(req,res)=>{
  const path=new URL(req.url,'http://127.0.0.1').pathname;
  if(path==='/config.js'||path==='/atlas-cloud.js'){res.writeHead(200,{'Content-Type':'text/javascript'}).end(path==='/atlas-cloud.js'?cloud:'');return;}
- if(path!=='/'&&path!=='/before'&&path!=='/atlas-library-shared.js'){res.writeHead(404).end();return;}
- res.writeHead(200,{'Content-Type':path!=='/atlas-library-shared.js'?'text/html; charset=utf-8':'text/javascript; charset=utf-8'}).end(path==='/before'?beforeHtml:await readFile(path==='/'?'index.html':'atlas-library-shared.js'));
+ if(!['/','/before','/atlas-library-shared.js','/atlas-dashboard.js','/atlas-dashboard.css'].includes(path)){res.writeHead(404).end();return;}
+ res.writeHead(200,{'Content-Type':path.endsWith('.css')?'text/css':path.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8'}).end(path==='/before'?beforeHtml:await readFile(path==='/'?'index.html':path.slice(1)));
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch();
@@ -41,6 +41,25 @@ try{
  await page.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
+ await page.locator('button[data-menu=perfil]').click();
+ const heat=page.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap');
+ await heat.waitFor();
+ assert.equal(await heat.locator('button').count(),91);
+ const activeDay=heat.locator('.atlas-heat-4');
+ await activeDay.click();
+ assert.match(await page.locator('#profileview .atlas-stat-detail .atlas-dashboard-day').textContent(),/1 evento/);
+ await mkdir('artifacts',{recursive:true});
+ await page.locator('#profileview').screenshot({path:'artifacts/perfil-mangas-desktop.png'});
+ await page.locator('#animeProfile .atlas-dashboard-heatmap').waitFor();
+ await page.locator('#animeProfile').screenshot({path:'artifacts/perfil-animes-desktop.png'});
+ const mobile=await browser.newPage({viewport:{width:390,height:844}});
+ await mobile.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
+ await mobile.goto('http://127.0.0.1:'+server.address().port);
+ await mobile.locator('button[data-menu=perfil]').click();
+ await mobile.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap').waitFor();
+ await mobile.locator('#profileview').screenshot({path:'artifacts/perfil-mangas-mobile.png'});
+ await mobile.locator('#animeProfile').screenshot({path:'artifacts/perfil-animes-mobile.png'});
+ await mobile.close();
  await page.locator('button[data-menu=mangas]').click();
  const manga=title=>page.locator('#grid .manga').filter({hasText:title});
  const get=(card)=>card.locator('[role=progressbar]').getAttribute('aria-valuenow');
@@ -53,6 +72,9 @@ try{
  await page.locator('#status').selectOption({label:'Lendo'});
  assert.equal(await page.locator('#grid .manga').count(),2);
  await page.locator('#resetFilters').click();
+ await page.locator('#authorFilter').selectOption('Autor de teste');
+ assert.equal(await page.locator('#grid .manga').count(),1);
+ await page.locator('#resetFilters').click();
  await page.locator('#sort').selectOption('title');
  assert.match(await page.locator('#grid .manga').first().innerText(),/Berserk/);
  await mkdir('artifacts',{recursive:true});
@@ -62,6 +84,10 @@ try{
  const aniListEntry=page.locator('#atlas-anilist-anime').getByText('Anime do AniList');
  await aniListEntry.waitFor();
  assert.match(await page.locator('#atlas-anilist-anime [role=progressbar]').getAttribute('aria-label'),/2\/4.*50%/);
+ await page.getByRole('searchbox',{name:'Buscar na coleção AniList'}).fill('sem correspondência');
+ assert.equal(await page.locator('#atlas-anilist-anime .atlas-ranked-card').count(),0);
+ await page.getByRole('searchbox',{name:'Buscar na coleção AniList'}).fill('anime do anilist');
+ assert.equal(await page.locator('#atlas-anilist-anime .atlas-ranked-card').count(),1);
  const cards=page.locator('.cr-anime-card');
  await cards.first().waitFor();
  const series=title=>cards.filter({hasText:title});
@@ -86,6 +112,9 @@ try{
  await old.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
  await old.goto('http://127.0.0.1:'+server.address().port+'/before');
  await old.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
+ await old.locator('button[data-menu=perfil]').click();
+ await old.locator('#profileview .profile-header').waitFor();
+ await old.locator('#profileview').screenshot({path:'artifacts/perfil-antes-desktop.png'});
  await old.locator('button[data-menu=mangas]').click();
  await old.locator('[data-layout=list]').click();
  await old.locator('#sort').selectOption('title');

@@ -1,0 +1,16 @@
+.atlas-dashboard-heatmap{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);grid-template-columns:repeat(13,minmax(0,1fr));gap:3px}
+.atlas-dashboard-heatmap button,.atlas-dashboard-legend i{display:block;border:1px solid #3b5267;border-radius:3px;aspect-ratio:1;min-width:0}
+.atlas-dashboard-heatmap button{padding:0;cursor:pointer}
+.atlas-dashboard-heatmap button:focus-visible{outline:2px solid var(--gold);outline-offset:1px;z-index:1}
+.atlas-heat-0{background:#25384a}.atlas-heat-1{background:#245b5c}.atlas-heat-2{background:#217c72}.atlas-heat-3{background:#269e8b}.atlas-heat-4{background:#49dfc7}
+.atlas-dashboard-legend{display:flex;align-items:center;justify-content:flex-end;gap:4px;font-size:.75rem;color:var(--muted);margin-top:8px}
+.atlas-dashboard-legend i{width:11px}
+.atlas-dashboard-day{min-height:2.5em}
+.atlas-dashboard-bars{display:grid;grid-auto-columns:minmax(0,1fr);grid-auto-flow:column;gap:3px;text-align:center}
+.atlas-dashboard-bars small,.atlas-dashboard-bars strong{display:block;font-size:.68rem;overflow:hidden}
+.atlas-dashboard-hour{gap:2px}
+.atlas-dashboard-hour small{font-size:.56rem;overflow:visible}
+.atlas-dashboard-track{height:66px;display:flex;align-items:flex-end;background:#23354a;border-radius:3px;overflow:hidden}
+.atlas-dashboard-track i{display:block;width:100%;background:linear-gradient(#49dfc7,#187d82)}
+.atlas-dashboard-grade .atlas-dashboard-track i{background:linear-gradient(var(--gold),#ad7224)}
+.atlas-anime-activity{margin-top:18px;max-width:520px}
