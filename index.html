@@ -131,7 +131,7 @@ let entries=[],shown=0,view='perfil',selected=null;const $=x=>document.getElemen
    if(western)return western;
  }
  return m.title?.romaji||m.title?.native||'Sem título';
-};let aliases={};const pic=m=>m.coverImage?.extraLarge||m.coverImage?.large||m.coverImage?.medium||'';const year=m=>m.startDate?.year||'';const storageKey=id=>'manga-atlas-rating-'+id;let personalRatings={};function personal(id){return personalRatings[String(id)]||{}}function mean(v){return v.length?v.reduce((a,b)=>a+b,0)/v.length:0}function score(e){let v=Object.values(personal(e.media.id)).map(Number).filter(x=>x>=0&&x<=10);return v.length?mean(v):null}function genreMeans(){let d={};entries.forEach(e=>{if(e.score>0)(e.media.genres||[]).forEach(g=>(d[g]??=[]).push(e.score))});return Object.fromEntries(Object.entries(d).map(([k,v])=>[k,mean(v)]))}function affinity(e){let g=genreMeans();let vals=(e.media.genres||[]).filter(x=>g[x]!=null).map(x=>g[x]);let personal=vals.length?mean(vals):5;let pub=(e.media.averageScore||0)/10;let pop=Math.min(10,Math.log10(Math.max(1,e.media.popularity||1))*2);return .5*personal+.4*pub+.1*pop}function showNotice(msg){const notice=$('notice');if(notice){notice.textContent=msg;notice.classList.remove('hidden')}const toast=$('atlas-cloud-message');if(toast){toast.textContent=msg;toast.hidden=false;toast.classList.toggle('bad',/^(Não foi possível|Erro|Falha)/i.test(msg));const stamp=msg;setTimeout(()=>{if(toast.textContent===stamp)toast.hidden=true},6500)}}function load(payload,stamp){let lists=payload?.data?.MediaListCollection?.lists||[];let ids=new Set();entries=lists.flatMap(l=>l.entries||[]).filter(e=>{if(!e.media||ids.has(e.media.id))return false;ids.add(e.media.id);return true});if(!entries.length)throw Error('Resposta sem obras.');$('syncinfo').textContent=`${entries.length} obras na coleção`;setupFilters();render()}
+};let aliases={};const pic=m=>m.coverImage?.extraLarge||m.coverImage?.large||m.coverImage?.medium||'';const year=m=>m.startDate?.year||'';const storageKey=id=>'manga-atlas-rating-'+id;let personalRatings={};function personal(id){return personalRatings[String(id)]||{}}function mean(v){return v.length?v.reduce((a,b)=>a+b,0)/v.length:0}function score(e){let v=Object.values(personal(e.media.id)).map(Number).filter(x=>x>=0&&x<=10);return v.length?mean(v):null}function genreMeans(){let d={};entries.forEach(e=>{if(e.score>0)(e.media.genres||[]).forEach(g=>(d[g]??=[]).push(e.score))});return Object.fromEntries(Object.entries(d).map(([k,v])=>[k,mean(v)]))}function affinity(e){let g=genreMeans();let vals=(e.media.genres||[]).filter(x=>g[x]!=null).map(x=>g[x]);let personal=vals.length?mean(vals):5;let pub=(e.media.averageScore||0)/10;let pop=Math.min(10,Math.log10(Math.max(1,e.media.popularity||1))*2);return .5*personal+.4*pub+.1*pop}function showNotice(msg){const notice=$('notice');if(notice){notice.textContent=msg;notice.classList.remove('hidden')}const toast=$('atlas-cloud-message');if(toast){toast.textContent=msg;toast.hidden=false;toast.classList.toggle('bad',/^(Não foi possível|Erro|Falha)/i.test(msg));const stamp=msg;setTimeout(()=>{if(toast.textContent===stamp)toast.hidden=true},6500)}}function load(payload,stamp){let lists=payload?.data?.MediaListCollection?.lists||[];let ids=new Set();entries=lists.flatMap(l=>l.entries||[]).filter(e=>{if(!e.media||ids.has(e.media.id))return false;ids.add(e.media.id);return true});if(!entries.length)throw Error('Resposta sem obras.');$('syncinfo').textContent=`${entries.length} obras na coleção`;setupFilters();render();setTimeout(()=>atlasRefreshChapterReferences(false),1200)}
 document.addEventListener('click',e=>{const btn=e.target.closest('[data-layout]');if(btn)setCatalogLayout(btn.dataset.layout);if(e.target.id==='resetFilters'){for(const id of ['search','status','genre','format','country','publication','tag','yearFilter','ratingFilter'])$(id).value='';shown=48;render()}});
 async function boot(){$('sort').value='personal';await Promise.all([fetchChapterRefs(),fetchChapterSources()]);try{let ar=await fetch('/api/aliases');if(ar.ok)aliases=await ar.json()}catch{}try{let rr=await fetch('/api/avaliacoes');if(rr.ok){personalRatings=await rr.json()}}catch{}try{let r=await fetch('/api/library');if(!r.ok)throw Error('servidor indisponível');let j=await r.json();load(j.data,j.updated||'cópia local')}catch{try{let r=await fetch('biblioteca_inicial.json');load(await r.json(),'cópia inicial')}catch(e){showNotice('Não foi possível carregar sua biblioteca privada. Verifique a conexão e tente novamente.')}}}
 function setupFilters(){const options=(id,values)=>{let el=$(id),v=el.value;el.innerHTML='<option value="">'+({status:'Todos os status',genre:'Todos os gêneros',format:'Todos os formatos',publication:'Todas as situações',country:'Todos os países',tag:'Todas as tags',yearFilter:'Todos os anos'}[id]||'Todos')+'</option>'+values.sort().map(x=>`<option value="${escapeHTML(x)}">${escapeHTML(x)}</option>`).join('');el.value=v};options('status',[...new Set(entries.map(e=>names[e.status]||e.status))]);options('genre',[...new Set(entries.flatMap(e=>e.media.genres||[]))]);options('format',[...new Set(entries.map(e=>e.media.format||'Não informado'))]);options('country',[...new Set(entries.map(e=>classification(e.media)))]);options('publication',[...new Set(entries.map(e=>publicationLabel(e.media.status)))]);options('tag',[...new Set(entries.flatMap(e=>(e.media.tags||[]).map(t=>t.name)).filter(Boolean))]);options('yearFilter',[...new Set(entries.map(e=>String(year(e.media)||'')).filter(Boolean))])}
@@ -169,9 +169,109 @@ async function fetchActivity(force=false){
  finally{activityLoading=false;if(view==='perfil')renderProfile()}
 }
 async function fetchChapterRefs(){try{chapterRefs=await jsonApi('/api/capitulos-referencia')}catch{chapterRefs={}}}
-async function fetchChapterSources(){try{chapterSources=await jsonApi('/api/capitulos-fontes')||{}}catch{chapterSources={}}if(entries.length)render()}
+async function fetchChapterSources(){try{chapterSources=await jsonApi('/api/capitulos-fontes')||{}}catch{chapterSources={}}chapterSources={...chapterSources,...atlasChapterCacheRead()};if(entries.length)render()}
 async function verifyChapterSource(id){try{const r=await jsonApi('/api/capitulos-consultar/'+id);chapterSources[String(id)]=r;render();return r}catch(ex){return {error:ex.message}}}
-function chapterSourceInfo(e){const r=chapterSources[String(e.media.id)]||{};return r.chapter?`${r.source||'Fonte externa'} · ${r.confidence||'referência'}${r.stale?' · desatualizada':''}`:'Sem referência externa verificada'}
+
+const atlasChapterCacheKey='atlas-chapter-lookup-v1';
+let atlasChapterLookupBusy=false;
+function atlasChapterCacheRead(){
+ try{const c=JSON.parse(localStorage.getItem(atlasChapterCacheKey)||'{}');return c&&typeof c==='object'?c:{}}catch{return {}}
+}
+function atlasChapterCacheSave(){
+ try{localStorage.setItem(atlasChapterCacheKey,JSON.stringify(chapterSources))}catch{}
+}
+function atlasNormalizeTitle(t){return String(t||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function atlasCandidateTitles(m){return [...new Set([m.title?.english,m.title?.romaji,m.title?.native,...(m.synonyms||[])].filter(Boolean))]}
+function atlasSameTitle(candidate,m){
+ const norm=atlasNormalizeTitle(candidate);
+ return norm.length>=3&&atlasCandidateTitles(m).some(t=>atlasNormalizeTitle(t)===norm);
+}
+function atlasChapterNumber(raw){
+ const text=String(raw??'').trim();
+ if(!/^\d+(?:\.\d+)?$/.test(text))return null;
+ const value=Number(text);
+ return Number.isFinite(value)&&value>0&&value<100000?value:null;
+}
+async function atlasMangaDexLookup(m){
+ const titles=atlasCandidateTitles(m).filter(t=>/[a-zA-Z]/.test(t)).slice(0,3);
+ for(const name of titles){
+  const search=new URL('https://api.mangadex.org/manga');
+  search.searchParams.set('title',name);search.searchParams.set('limit','12');
+  const res=await fetch(search,{headers:{Accept:'application/json'}});
+  if(!res.ok)throw Error('MangaDex HTTP '+res.status);
+  const data=await res.json();
+  const match=(data.data||[]).find(x=>{
+   const attrs=x.attributes||{};
+   return [...Object.values(attrs.title||{}),...Object.values(attrs.altTitles||{}).flatMap(t=>Object.values(t||{}))].some(t=>atlasSameTitle(t,m));
+  });
+  if(!match)continue;
+  const url=new URL('https://api.mangadex.org/chapter');
+  url.searchParams.set('manga',match.id);
+  url.searchParams.set('limit','100');
+  url.searchParams.set('order[chapter]','desc');
+  url.searchParams.set('translatedLanguage[]','en');
+  url.searchParams.append('translatedLanguage[]','pt-br');
+  const cr=await fetch(url,{headers:{Accept:'application/json'}});
+  if(!cr.ok)throw Error('MangaDex capítulos HTTP '+cr.status);
+  const chapters=(await cr.json()).data||[];
+  const numbers=chapters.map(c=>atlasChapterNumber(c.attributes?.chapter)).filter(n=>n!==null);
+  const chapter=numbers.length?Math.max(...numbers):null;
+  return {chapter,seriesUrl:'https://mangadex.org/title/'+match.id,source:'MangaDex',note:'Capítulo de tradução disponível; pode não ser o último capítulo original.'};
+ }
+ return null;
+}
+async function atlasMangaUpdatesLookup(m){
+ const name=atlasCandidateTitles(m).find(t=>/[a-zA-Z]/.test(t));
+ if(!name)return null;
+ const response=await fetch('https://api.mangaupdates.com/v1/series/search',{
+  method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},
+  body:JSON.stringify({search:name,perpage:15,page:1})
+ });
+ if(!response.ok)throw Error('MangaUpdates HTTP '+response.status);
+ const data=await response.json();
+ const result=(data.results||[]).find(x=>atlasSameTitle(x.record?.title||x.title,m));
+ if(!result)return null;
+ const record=result.record||result;
+ const chapter=atlasChapterNumber(record.latest_chapter||record.latest_chapter_number||record.last_chapter);
+ return {chapter,seriesUrl:record.url||('https://www.mangaupdates.com/series/'+(record.series_id||'')),source:'MangaUpdates'};
+}
+async function atlasLookupOne(e){
+ const id=String(e.media.id),old=chapterSources[id]||{},result={checkedAt:new Date().toISOString(),mangadex:null,mangaupdates:null,errors:[]};
+ const findings=await Promise.allSettled([atlasMangaDexLookup(e.media),atlasMangaUpdatesLookup(e.media)]);
+ for(let i=0;i<findings.length;i++){
+  const item=findings[i],key=i===0?'mangadex':'mangaupdates';
+  if(item.status==='fulfilled')result[key]=item.value;
+  else result.errors.push((i===0?'MangaDex':'MangaUpdates')+': '+String(item.reason?.message||item.reason));
+ }
+ const md=result.mangadex?.chapter,mu=result.mangaupdates?.chapter;
+ // A fonte MangaUpdates só entra no cálculo se informar explicitamente um número.
+ // Traduções do MangaDex não são tratadas como publicação original confirmada.
+ const reliable=mu!==null&&mu!==undefined&&Number.isFinite(mu)&&mu>0;
+ chapterSources[id]={...old,...result,chapter:reliable?mu:null,source:reliable?'MangaUpdates':'Aguardando confirmação',confidence:reliable?(md===mu?'Conferido também no MangaDex':'Referência MangaUpdates'):'Sem total original confirmado'};
+ atlasChapterCacheSave();
+ return chapterSources[id];
+}
+async function atlasRefreshChapterReferences(force=false){
+ if(atlasChapterLookupBusy||!entries.length)return;
+ atlasChapterLookupBusy=true;
+ const btn=document.getElementById('atlasChapterRefresh');
+ const note=document.getElementById('atlasChapterStatus');
+ const list=entries.filter(e=>e.status==='CURRENT'&&e.media.status!=='FINISHED').sort((a,b)=>(b.progress||0)-(a.progress||0));
+ const selected=list.filter(e=>force||!chapterSources[String(e.media.id)]?.checkedAt||Date.now()-Date.parse(chapterSources[String(e.media.id)].checkedAt)>86400000).slice(0,force?20:8);
+ if(btn)btn.disabled=true;
+ let ok=0,failed=0;
+ for(let i=0;i<selected.length;i++){
+  if(note)note.textContent='Consultando MangaUpdates e MangaDex: '+(i+1)+'/'+selected.length+'…';
+  const r=await atlasLookupOne(selected[i]);
+  if(r.chapter)ok++;else failed++;
+  if(view==='perfil')renderProfileRows();
+ }
+ if(note)note.textContent=selected.length?`Consulta concluída: ${ok} referências numéricas, ${failed} sem confirmação. ${list.length>selected.length?'Use Atualizar para consultar mais obras.':''}`:'Referências já consultadas recentemente.';
+ if(btn)btn.disabled=false;
+ atlasChapterLookupBusy=false;
+}
+
+function chapterSourceInfo(e){const r=chapterSources[String(e.media.id)]||{};return r.chapter?`${r.source||'Fonte externa'} · ${r.confidence||'referência'} · consultado ${r.checkedAt?new Date(r.checkedAt).toLocaleDateString('pt-BR'):'anteriormente'}`:(r.mangadex?.chapter?`MangaDex: tradução até cap. ${r.mangadex.chapter}; publicação original ainda não confirmada`:'Sem referência externa verificada')}
 
 function latestChapter(e){
  const m=e.media,fixed=Number(m.chapters)||0,custom=Number(chapterRefs[String(m.id)])||0;
@@ -200,7 +300,7 @@ function progressMarkup(e){
  const hasRead=unknown&&v.progress>0;
  const pct=unknown?0:v.percent;
  const label=v.isComplete?'Leitura marcada como concluída':v.caughtUp?'Em dia com a referência disponível':unknown?`${v.progress} capítulo(s) lido(s) · total ainda não confirmado`:`${v.percent}% · ${v.progress}/${v.latest} capítulos · ${chapterSourceInfo(e)}`;
- const caption=v.isComplete?(v.latest!==null?`Concluído · ${v.progress}/${v.latest} cap.`:`Concluído · ${v.progress} cap. registrados`):unknown?(v.progress>0?`${v.progress} cap. lidos · total não confirmado`:'0 cap. lidos · total não confirmado'):`${v.percent}% · ${v.progress}/${v.latest} cap.`;
+ const caption=v.isComplete?(v.latest!==null?`Concluído · ${v.progress}/${v.latest} cap.`:`Concluído · ${v.progress} cap. registrados`):unknown?(v.progress>0?`${v.progress} cap. lidos · ${chapterSources[String(e.media.id)]?.mangadex?.chapter?'MangaDex: tradução '+chapterSources[String(e.media.id)].mangadex.chapter:'total não confirmado'}`:'0 cap. lidos · total não confirmado'):`${v.percent}% · ${v.progress}/${v.latest} cap.`;
  return `<div class="progress-wrap" title="${escapeHTML(label)}"><div class="profile-progress ${cls} ${unknown?'unverified':''} ${hasRead?'has-reading':''}" role="progressbar" aria-label="${escapeHTML(label)}" aria-valuemin="0" ${unknown?'':`aria-valuemax="100" aria-valuenow="${pct}"`}><i style="width:${pct}%"></i></div><span class="progress-caption">${caption}</span></div>`;
 }
 const activityDate=a=>Number(a?.createdAt)>0?new Date(a.createdAt*1000):null;
@@ -280,7 +380,7 @@ function renderProfile(){
  <section class="profile-panel"><h3>Gêneros favoritos</h3><p class="muted mini">Por quantidade na coleção; a média considera apenas obras avaliadas.</p>${top.map(([g,v])=>`<div class="genre-mini"><div><b>${escapeHTML(g)}</b><span>${v.count} · ★ ${v.scores.length?mean(v.scores).toFixed(1):'—'}</span></div><div class="mini-bar"><i style="width:${v.count/max*100}%"></i></div></div>`).join('')}</section>
  <section class="profile-panel"><h3>Distribuição da coleção</h3>${counts.map(x=>`<div class="genre-mini"><div><b>${x.label}</b><span>${x.n}</span></div><div class="mini-bar"><i style="width:${x.n/entries.length*100}%"></i></div></div>`).join('')}</section>
  </aside>
- <div class="profile-center">
+ <div class="profile-center"><section class="profile-panel atlas-chapter-panel"><div class="profile-panel-head"><h2>Capítulos publicados</h2><button type="button" class="sync" id="atlasChapterRefresh">↻ Conferir fontes</button></div><p class="muted mini" id="atlasChapterStatus">Referências consultadas no MangaUpdates e MangaDex. Traduções não são confundidas com capítulos originais.</p></section>
  <section class="profile-panel"><div class="profile-panel-head"><h2>Últimas leituras no AniList</h2><button class="sync" id="refreshActivity">↻ Atualizar feed</button></div><div class="recent-strip">${recent.length?recent.map(a=>`<button class="recent-item" data-profile-id="${a.media.id}"><img loading="lazy" src="${escapeHTML(profileCover(a.media))}" alt=""><strong>${escapeHTML(title(a.media))}</strong><small>${escapeHTML(activityText(a))}</small><small>${niceDate(activityDate(a))}</small></button>`).join(''):`<p class="muted">${escapeHTML(activityFeed?.error||'Consultando atividades do AniList…')}</p>`}</div><div class="activity-history"><h3>Histórico recente do AniList</h3>${activities.slice(0,15).map(a=>`<button class="activity-history-item" data-profile-id="${a.media.id}"><img src="${escapeHTML(profileCover(a.media))}" alt=""><span><b>${escapeHTML(title(a.media))}</b><small>${escapeHTML(activityText(a))}</small></span><time>${niceDate(activityDate(a))}</time></button>`).join('')}</div></section>
  <section class="profile-panel"><div class="profile-panel-head"><h2>Minha coleção</h2><span id="profileCount" class="muted">${rows.length} resultados</span></div>${profileFilters()}<div id="profileRows"></div><button class="sync" id="profileMore">Mostrar mais obras</button></section>
  </div>
@@ -293,6 +393,7 @@ function renderProfile(){
  for(const id of ['profileClass','profileStatus','profileYear','profileAuthor','profileSort'])$(id).onchange=e=>{if(id==='profileClass')profileClass=e.target.value;else if(id==='profileStatus')profileStatus=e.target.value;else if(id==='profileYear')profileYear=e.target.value;else if(id==='profileAuthor')profileAuthor=e.target.value;else profileSort=e.target.value;profileLimit=45;renderProfileRows()};
  $('profileMore').onclick=()=>{profileLimit+=45;renderProfileRows()};
  $('refreshActivity').onclick=()=>fetchActivity(true);
+ const chapterButton=$('atlasChapterRefresh');if(chapterButton)chapterButton.onclick=()=>atlasRefreshChapterReferences(true);
  if(!activityFeed&&!activityLoading)fetchActivity();
  renderProfileRows();attachProfileOpen(root);if(window.atlasAnimeProfile)window.atlasAnimeProfile(root);
 }
