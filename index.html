@@ -292,7 +292,7 @@ function attachProfileOpen(root){root.querySelectorAll('[data-profile-id]').forE
 function renderProfileRows(){
  const a=profileEntries(),area=$('profileRows');if(!area)return;
  $('profileCount').textContent=`${a.length} resultados`;
- area.innerHTML=a.slice(0,profileLimit).map(e=>{let m=e.media,d=listDate(e.startedAt),end=listDate(e.completedAt),author=authorNames(m)[0]||'Não informado';return `<button class="profile-row" data-profile-id="${m.id}"><img loading="lazy" src="${escapeHTML(pic(m))}" alt=""><div class="profile-row-main"><strong>${escapeHTML(title(m))}</strong><small>${escapeHTML(classification(m))} · ${escapeHTML(names[e.status]||e.status)} · ${escapeHTML(author)}</small>${progressMarkup(e)}</div><div class="profile-row-meta"><b>★ ${e.score||'—'}</b><small>${e.progress||0}/${latestChapter(e)||'?'} cap.</small></div><div class="profile-row-meta"><b>${year(m)||'—'}</b><small>Publicação</small></div><div class="profile-row-meta"><b>${d?niceDate(d):'—'}</b><small>Início</small></div><div class="profile-row-meta"><b>${updatedDate(e)?niceDate(updatedDate(e)):'—'}</b><small>Atualização</small></div></button>`}).join('');
+ area.innerHTML=a.slice(0,profileLimit).map(e=>{let m=e.media,d=listDate(e.startedAt),end=listDate(e.completedAt),author=authorNames(m)[0]||'Não informado';return `<button class="profile-row" data-profile-id="${m.id}"><img loading="lazy" src="${escapeHTML(pic(m))}" alt=""><div class="profile-row-main"><strong>${escapeHTML(title(m))}</strong><small>${escapeHTML(classification(m))} · ${escapeHTML(names[e.status]||e.status)} · ${escapeHTML(author)}</small>${progressMarkup(e)}</div><div class="profile-row-meta"><b>★ ${e.score||'—'}</b><small>${e.progress||0}/${latestChapter(e)||'?'} cap.</small></div><div class="profile-row-secondary"><div class="profile-row-meta"><b>${year(m)||'—'}</b><small>Publicação</small></div><div class="profile-row-meta"><b>${d?niceDate(d):'—'}</b><small>Início</small></div><div class="profile-row-meta"><b>${updatedDate(e)?niceDate(updatedDate(e)):'—'}</b><small>Atualização</small></div></div></button>`}).join('');
  $('profileMore').classList.toggle('hidden',a.length<=profileLimit);attachProfileOpen(area);
 }
 
@@ -507,6 +507,14 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
 </script>
 <style id="atlas-mobile-v3">
 /* Manga Atlas Mobile v3 — recursos idênticos, apresentação otimizada */
+/* Mantém os campos de publicação e datas também no celular. */
+.profile-row-secondary{display:contents}
+@media(min-width:901px) and (max-width:1150px){
+ #atlas-private header .top>.atlas-navigation{flex-wrap:nowrap}
+ #atlas-private header .top .atlas-submenus{width:auto;flex:0 1 auto}
+ #atlas-private header .top .atlas-subnav{flex-wrap:nowrap}
+}
+
 #atlas-private header .top{grid-template-columns:max-content minmax(100px,1fr) max-content}
 #atlas-private header .top>.atlas-actions{grid-column:3;grid-row:1;display:flex;align-items:center;justify-content:flex-end;gap:clamp(8px,1.1vw,19px);min-width:0}
 #atlas-private header .top>.atlas-actions>.sync,
@@ -563,6 +571,11 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  #atlas-private .recent-strip .recent-item{flex:0 0 clamp(112px,36vw,150px);min-width:0;scroll-snap-align:start}
  #atlas-private .profile-row{min-width:0;gap:8px}
  #atlas-private .profile-row-main{min-width:0}
+ #atlas-private .profile-row-secondary{display:flex;grid-column:2/-1;grid-row:2;flex-wrap:wrap;gap:4px 12px;align-items:center;min-width:0}
+ #atlas-private .profile-row-secondary .profile-row-meta{display:flex!important;align-items:baseline;gap:5px;min-width:0}
+ #atlas-private .profile-row-secondary .profile-row-meta b{font-size:10px}
+ #atlas-private .profile-row-secondary .profile-row-meta small{font-size:9px}
+
  #atlas-private .cr-page{padding:12px 0}
  #atlas-private .cr-kpis{gap:8px}
  #atlas-private .cr-kpis>div{padding:12px;min-width:0}
