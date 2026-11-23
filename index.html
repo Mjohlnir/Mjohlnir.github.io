@@ -275,27 +275,17 @@ async function atlasLookupOne(e){
  return chapterSources[id];
 }
 async function atlasRefreshChapterReferences(force=false){
- if(atlasChapterLookupBusy||!entries.length)return;
- // GitHub Pages é estático. APIs que bloqueiam CORS/403 não podem ser consultadas
- // diretamente pelo navegador; não repetir dezenas de chamadas malsucedidas.
- const blocked=(()=>{try{return JSON.parse(localStorage.getItem('atlas-chapter-api-blocked-v2')||'null')}catch{return null}})();
- if(blocked&&Date.now()-blocked.at<7*86400000&&!force)return;
+ // A versão web consulta automaticamente o cache Supabase ao carregar.
+ // As verificações externas são executadas na Edge Function, não no navegador.
+ if(atlasChapterLookupBusy)return;
  atlasChapterLookupBusy=true;
- const list=entries.filter(e=>e.status==='CURRENT'&&e.media.status!=='FINISHED')
-  .sort((a,b)=>(b.progress||0)-(a.progress||0));
- const selected=list.filter(e=>!chapterSources[String(e.media.id)]?.checkedAt||
-  Date.now()-Date.parse(chapterSources[String(e.media.id)].checkedAt)>7*86400000).slice(0,3);
- let blockedErrors=[];
- for(const e of selected){
-  const r=await atlasLookupOne(e);
-  blockedErrors.push(...(r.errors||[]).filter(x=>/403|failed to fetch|cors|networkerror/i.test(x)));
+ try{
+  const updated=await jsonApi('/api/capitulos-fontes');
+  chapterSources={...chapterSources,...updated};
+  atlasChapterCacheSave();
   if(view==='perfil')renderProfileRows();
-  if(blockedErrors.length>=2)break;
- }
- if(blockedErrors.length){
-  try{localStorage.setItem('atlas-chapter-api-blocked-v2',JSON.stringify({at:Date.now(),errors:[...new Set(blockedErrors)]}))}catch{}
- }
- atlasChapterLookupBusy=false;
+ }catch(error){console.warn('[Atlas] Consulta de capítulos:',error.message)}
+ finally{atlasChapterLookupBusy=false}
 }
 
 function chapterSourceInfo(e){const r=chapterSources[String(e.media.id)]||{};return r.chapter?`${r.source||'Fonte externa'} · ${r.confidence||'referência'} · consultado ${r.checkedAt?new Date(r.checkedAt).toLocaleDateString('pt-BR'):'anteriormente'}`:(r.mangadex?.chapter?`MangaDex: tradução até cap. ${r.mangadex.chapter}; publicação original ainda não confirmada`:'Sem referência externa verificada')}
