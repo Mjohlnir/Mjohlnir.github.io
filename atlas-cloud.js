@@ -78,31 +78,31 @@ function hideImport(){const panel=$('atlas-import');if(panel)panel.hidden=true;}
 async function session(s){if(sessionBusy)return;sessionBusy=true;try{const u=s?.user||null;if(!u){account=null;initializedFor='';$('atlas-private').hidden=true;$('atlas-access').hidden=false;$('atlas-user').textContent='';message('');return;}if(initializedFor===u.id)return;account=u;$('atlas-user').textContent=u.email||'Conta autenticada';$('atlas-access').hidden=true;$('atlas-loading').hidden=false;const saved=await pref('anilist_username',{name:''});username=typeof saved==='string'?saved:(typeof saved?.name==='string'?saved.name:'');$('atlas-username').value=username;await loadFromDb();initializedFor=u.id;$('atlas-loading').hidden=true;$('atlas-private').hidden=false;window.atlasCloud.user=u;window.atlasCloud.anilistUsername=username;window.dispatchEvent(new Event('atlas-cloud-ready'));if(!library.some(r=>r.media_type==='MANGA')&&!watch.length)showImport();}catch(e){message('Falha ao carregar a conta: '+e.message,true);$('atlas-loading').hidden=true;$('atlas-access').hidden=false;}finally{sessionBusy=false;}}
 
 // Preferência visual privada: apenas o proprietário acessa a imagem original.
-async function atlasBannerRead(){
+async function atlasBannerRead(scope='profile'){
  if(!account)return {mode:'automatic'};
- const value=await pref('profile_banner',{mode:'automatic'});
+ const value=await pref(scope+'_banner',{mode:'automatic'});
  if(value?.mode==='upload'&&value.path){
   const {data,error}=await db.storage.from('atlas-banners').createSignedUrl(value.path,3600);
   return {...value,url:error?'':data?.signedUrl||''};
  }
  return value||{mode:'automatic'};
 }
-async function atlasBannerSave(value){
+async function atlasBannerSave(value,scope='profile'){
  if(!account)throw Error('Faça login');
  const allowed=['automatic','library','upload'];
  if(!allowed.includes(value?.mode))throw Error('Modo de banner inválido');
- await setPref('profile_banner',value);
- return atlasBannerRead();
+ await setPref(scope+'_banner',value);
+ return atlasBannerRead(scope);
 }
-async function atlasBannerUpload(file){
+async function atlasBannerUpload(file,scope='profile'){
  if(!account)throw Error('Faça login');
  if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Use JPG, PNG ou WebP');
  if(file.size>5*1024*1024)throw Error('A imagem deve ter no máximo 5 MB');
  const extension=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
- const path=account.id+'/profile-banner.'+extension;
+ const path=account.id+'/'+scope+'-banner.'+extension;
  const {error}=await db.storage.from('atlas-banners').upload(path,file,{upsert:true,contentType:file.type,cacheControl:'3600'});
  if(error)throw error;
- return atlasBannerSave({mode:'upload',path});
+ return atlasBannerSave({mode:'upload',path},scope);
 }
 
 window.atlasCloud={fetch:atlasFetch,user:null,anilistUsername:'',bannerRead:atlasBannerRead,bannerSave:atlasBannerSave,bannerUpload:atlasBannerUpload};
