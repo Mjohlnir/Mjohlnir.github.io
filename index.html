@@ -523,6 +523,12 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
 @media(max-width:1150px){
  #atlas-private header .top>.atlas-actions{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-start;gap:9px}
 }
+@media(min-width:721px) and (max-width:1000px){
+ /* Em tablets, o perfil precisa da largura inteira para mostrar seus dados. */
+ #atlas-private .profile-layout{grid-template-columns:minmax(0,1fr)}
+ #atlas-private .profile-side:last-child{display:flex;grid-column:auto}
+ #atlas-private .profile-controls{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
 @media(max-width:900px){
  #atlas-private header .top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 10px;padding:10px 14px}
  #atlas-private header .top>.logo{grid-column:1;grid-row:1;min-width:0;font-size:18px;letter-spacing:.09em}
@@ -577,6 +583,7 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  #atlas-private .profile-row-secondary .profile-row-meta small{font-size:9px}
 
  #atlas-private .cr-page{padding:12px 0}
+ #atlas-private .cr-anime-grid{grid-template-columns:minmax(0,1fr)}
  #atlas-private .cr-kpis{gap:8px}
  #atlas-private .cr-kpis>div{padding:12px;min-width:0}
  #atlas-private .cr-kpis strong{font-size:24px}
