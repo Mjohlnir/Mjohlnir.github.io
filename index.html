@@ -630,12 +630,12 @@ let topCache=null,topLoading=false;
 async function loadTopAnime(){
  if(topCache||topLoading)return;topLoading=true;
  try{
-  const query=`query { Page(page:1,perPage:16){media(type:ANIME,sort:SCORE_DESC,isAdult:false){id title{english romaji}coverImage{large} averageScore siteUrl format seasonYear}}`;
+  const query=`query { Page(page:1,perPage:16){media(type:ANIME,sort:SCORE_DESC,isAdult:false){id title{english romaji}coverImage{large} bannerImage averageScore siteUrl format seasonYear}}`;
   const res=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:query+'}'})});
   if(!res.ok)throw Error('AniList HTTP '+res.status);
   const data=await res.json();if(data.errors?.length)throw Error(data.errors[0].message);
   topCache=data.data?.Page?.media||[];
-  paintTopAnime();
+  paintTopAnime();window.atlasCategoryBannerRender?.('animes');
  }catch(e){const el=root()?.querySelector('#atlas-anime-top');if(el)el.innerHTML='<p class="muted">Ranking do AniList temporariamente indisponível.</p>'}finally{topLoading=false}
 }
 function paintTopAnime(){
@@ -1179,7 +1179,9 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  function paint(scope){
   const node=document.getElementById(scope==='mangas'?'atlas-manga-banner':'atlas-anime-banner');if(!node)return;
   const p=cache[scope],items=options(scope),selected=p.mode==='library'?items.find(x=>x.id===String(p.id)):items[0];
-  const image=p.mode==='upload'?p.url:(selected?.cover||(scope==='animes'&&p.mode==='automatic'?animeFallbackUrl:''));
+  const topFrieren=scope==='animes'&&p.mode==='automatic'&&typeof topCache!=='undefined'&&Array.isArray(topCache)?topCache.find(m=>/frieren/i.test([m.title?.english,m.title?.romaji].join(' '))):null;
+  const rankedFallback=topFrieren?.bannerImage||topFrieren?.coverImage?.large||'';
+  const image=p.mode==='upload'?p.url:(selected?.cover||(scope==='animes'&&p.mode==='automatic'?(rankedFallback||animeFallbackUrl):''));
   node.style.setProperty('--atlas-category-art',image?'url('+JSON.stringify(image)+')':'none');
   node.style.setProperty('--atlas-category-position',String(Number(p.position??50))+'%');
   if(scope==='animes'&&p.mode==='automatic'&&!image)resolveAnimeFallback();
@@ -1216,4 +1218,19 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  window.addEventListener('atlas-cloud-ready',()=>{for(const scope of ['mangas','animes'])window.atlasCategoryBannerRender(scope)});
  window.addEventListener('atlas-anime-loaded',()=>window.atlasCategoryBannerRender('animes'));
 })();
-</script><script type="module" src="atlas-cloud.js"></script></body></html>
+</script><style id="atlas-mobile-layout-fix-v26">
+/* Mesmo cabeçalho visual nos três menus, sem espaço morto. */
+#atlas-private #crunchyrollview .cr-hero.atlas-category-banner{display:flex;min-height:195px;height:auto;padding:22px 24px;margin:8px 0 16px;border:1px solid var(--stroke);border-radius:16px;background-image:linear-gradient(0deg,#0c1525f5 0%,#0c1525a0 55%,#0c152550 100%),var(--atlas-category-art,none);background-size:cover;background-position:center var(--atlas-category-position,50%);align-items:flex-end}
+#atlas-private #crunchyrollview .cr-hero.atlas-category-banner h1{margin:3px 0;font-size:clamp(27px,4vw,40px)}
+#atlas-private #crunchyrollview .cr-hero.atlas-category-banner .atlas-category-edit{top:12px;right:12px}
+@media(max-width:650px){
+ #atlas-private #crunchyrollview .cr-hero.atlas-category-banner{min-height:160px;padding:16px;margin:8px 0 12px}
+ #atlas-private #libraryContent>.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:14px}
+ #atlas-private #libraryContent>.stats .stat{min-width:0;padding:11px 9px;border-radius:11px}
+ #atlas-private #libraryContent>.stats .stat strong{font-size:23px}
+ #atlas-private #libraryContent>.stats .stat span{font-size:11px;line-height:1.2}
+ #atlas-private #libraryContent>.stats .stat:nth-child(n+4){grid-column:auto}
+ #atlas-private #crunchyrollview .atlas-showcase{padding:12px;margin-bottom:12px}
+ #atlas-private #crunchyrollview .atlas-section-heading h2{font-size:18px;line-height:1.25}
+}
+</style><script type="module" src="atlas-cloud.js"></script></body></html>
