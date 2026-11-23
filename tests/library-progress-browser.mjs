@@ -38,7 +38,7 @@ try{
  await page.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
- await page.evaluate(()=>{view='biblioteca';render()});
+ await page.locator('button[data-menu=mangas]').click();
  const manga=title=>page.locator('#grid .manga').filter({hasText:title});
  const get=(card)=>card.locator('[role=progressbar]').getAttribute('aria-valuenow');
  assert.equal(await get(manga('Berserk')),null);
@@ -54,7 +54,7 @@ try{
  assert.match(await page.locator('#grid .manga').first().innerText(),/Berserk/);
  await mkdir('artifacts',{recursive:true});
  const mangaImage=await page.locator('#catalogview').screenshot({path:'artifacts/mangas.png'});
- await page.locator('button.nav[data-view=crunchyroll]').click({force:true});
+ await page.locator('button[data-menu=animes]').click();
  const cards=page.locator('.cr-anime-card');
  await cards.first().waitFor();
  const series=title=>cards.filter({hasText:title});
