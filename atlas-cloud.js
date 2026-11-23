@@ -26,6 +26,36 @@ async function ratingsGet(){const r=await rows('critical_ratings');return Object
 async function ratingsSave(obj){if(!obj||typeof obj!=='object'||Array.isArray(obj))throw Error('Formato inválido de avaliações.');const values=Object.entries(obj).filter(([id,v])=>/^\d+$/.test(id)&&v&&typeof v==='object'&&!Array.isArray(v)).map(([id,v])=>({user_id:account.id,media_type:'MANGA',anilist_id:Number(id),dimensions:Object.fromEntries(Object.entries(v).filter(([,n])=>Number.isFinite(Number(n))&&Number(n)>=0&&Number(n)<=10).map(([k,n])=>[k,Number(n)])),updated_at:new Date().toISOString()}));if(values.length)await upsert('critical_ratings',values,'user_id,media_type,anilist_id');return {ok:true,obras:values.length};}
 async function activityFeed(){if(!username)return {activities:[],error:'Informe seu usuário AniList na aba Importar para consultar o feed.'};try{const u=await gql('query($name:String){User(name:$name){id name}}',{name:username});const uid=u.User?.id;if(!uid)throw Error('Usuário AniList não encontrado.');let all=[];for(let page=1;page<=3;page++){const d=await gql('query($id:Int,$page:Int){Page(page:$page,perPage:40){pageInfo{hasNextPage} activities(userId:$id,sort:ID_DESC){... on ListActivity{id createdAt status progress media{id type title{romaji english native} coverImage{extraLarge large medium}}}}}}',{id:uid,page});all.push(...(d.Page?.activities||[]).filter(a=>a?.media?.type==='MANGA'));if(!d.Page?.pageInfo?.hasNextPage)break;}return {source:'AniList',user:username,activities:all,fetchedAt:new Date().toISOString(),error:null};}catch(e){return {activities:[],error:e.message};}}
 async function related(id){const data=await gql('query($id:Int){Media(id:$id,type:MANGA){relations{edges{relationType node{id type title{romaji english native} coverImage{medium large} siteUrl}}}}}',{id:Number(id)});return {relations:data.Media?.relations?.edges||[],recommendations:[]};}
+
+// Capítulos: consulta autenticada à Edge Function. O banco armazena o cache;
+// números de traduções nunca são tratados como publicação original.
+async function chapterCloudReferences(){
+ const {data:{session}}=await db.auth.getSession();
+ if(!session?.access_token)throw Error('Sessão expirada');
+ const response=await fetch(cfg.supabaseUrl+'/functions/v1/atlas-chapters',{
+  method:'POST',
+  headers:{'Authorization':'Bearer '+session.access_token,'apikey':cfg.supabaseAnonKey,'Content-Type':'application/json'},
+  body:'{}'
+ });
+ const payload=await response.json();
+ if(!response.ok)throw Error(payload.error||'Falha ao consultar capítulos');
+ const out={};
+ for(const [id,r] of Object.entries(payload.references||{})){
+  const orig=Number(r.original_chapters)||null,translated=Number(r.translated_chapters)||null;
+  out[id]={
+   chapter:orig,
+   source:orig?r.original_source:'Publicação original não confirmada',
+   confidence:orig?'Total de obra concluída':'Não utilizar traduções como total publicado',
+   checkedAt:r.checked_at,
+   mangadex:translated?{chapter:translated,url:r.translation_url}:null,
+   mangaupdates:null,
+   errors:r.error_message?[r.error_message]:[],
+   translatedChapter:translated,
+   translationSource:r.translation_source
+  };
+ }
+ return out;
+}
 async function atlasFetch(url,options={}){try{const path=String(url),method=String(options?.method||'GET').toUpperCase(),body=options?.body?JSON.parse(options.body):null;if(!account)throw Error('Acesso não autenticado.');
  if(path==='historico_crunchyroll.json')return json(watchPayload());
  if(path==='biblioteca_inicial.json')return json(libraryPayload());
@@ -34,8 +64,8 @@ async function atlasFetch(url,options={}){try{const path=String(url),method=Stri
  if(path==='/api/aliases')return json(method==='POST'?(await setPref('aliases',body),{ok:true}):await pref('aliases'));
  if(path==='/api/avaliacoes')return json(method==='POST'?await ratingsSave(body):await ratingsGet());
  if(path==='/api/capitulos-referencia')return json(method==='POST'?(await setPref('chapter_refs',body),{ok:true}):await pref('chapter_refs'));
- if(path==='/api/capitulos-fontes')return json({});
- if(path.startsWith('/api/capitulos-consultar/'))return json({error:'A consulta automática de capítulos requer um serviço de verificação externo; indisponível nesta versão web.'},503);
+ if(path==='/api/capitulos-fontes')return json(await chapterCloudReferences());
+ if(path.startsWith('/api/capitulos-consultar/')){const all=await chapterCloudReferences();return json(all[path.split('/').pop()]||{error:'Referência ainda não disponível'});}
  if(path==='/api/atividades'||path==='/api/atividades/atualizar')return json(await activityFeed());
  if(path.startsWith('/api/relacionados/'))return json(await related(path.split('/').pop()));
  if(path==='/api/sync'){const name=$('atlas-username')?.value?.trim()||username;if(!name){showImport();$('atlas-username')?.focus();throw Error('Configure seu usuário AniList uma única vez em Importar dados. Ele será salvo na sua conta.');}return json(await syncAniList(name));}
