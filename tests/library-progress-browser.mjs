@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
+import {execFileSync} from 'node:child_process';
 import {readFile,mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
@@ -24,16 +25,17 @@ document.getElementById('atlas-private').hidden=false;
 document.getElementById('atlas-access').hidden=true;
 window.dispatchEvent(new Event('atlas-cloud-ready'));
 `;
+const beforeHtml=execFileSync('git',['show','origin/main:index.html']);
 const server=createServer(async(req,res)=>{
  const path=new URL(req.url,'http://127.0.0.1').pathname;
  if(path==='/config.js'||path==='/atlas-cloud.js'){res.writeHead(200,{'Content-Type':'text/javascript'}).end(path==='/atlas-cloud.js'?cloud:'');return;}
- if(path!=='/'&&path!=='/atlas-library-shared.js'){res.writeHead(404).end();return;}
- res.writeHead(200,{'Content-Type':path==='/'?'text/html; charset=utf-8':'text/javascript; charset=utf-8'}).end(await readFile(path==='/'?'index.html':'atlas-library-shared.js'));
+ if(path!=='/'&&path!=='/before'&&path!=='/atlas-library-shared.js'){res.writeHead(404).end();return;}
+ res.writeHead(200,{'Content-Type':path!=='/atlas-library-shared.js'?'text/html; charset=utf-8':'text/javascript; charset=utf-8'}).end(path==='/before'?beforeHtml:await readFile(path==='/'?'index.html':'atlas-library-shared.js'));
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch();
 try{
- const page=await browser.newPage({viewport:{width:1360,height:1000}});
+ const page=await browser.newPage({viewport:{width:900,height:1000}});
  page.setDefaultTimeout(12000);
  await page.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
  await page.goto('http://127.0.0.1:'+server.address().port);
@@ -53,7 +55,8 @@ try{
  await page.locator('#sort').selectOption('title');
  assert.match(await page.locator('#grid .manga').first().innerText(),/Berserk/);
  await mkdir('artifacts',{recursive:true});
- const mangaImage=await page.locator('#catalogview').screenshot({path:'artifacts/mangas.png'});
+ assert.ok(await manga('Fullmetal Alchemist').locator('[role=progressbar]').isVisible());
+ const mangaImage=await page.locator('#grid').screenshot({path:'artifacts/mangas.png'});
  await page.locator('button[data-menu=animes]').click();
  const cards=page.locator('.cr-anime-card');
  await cards.first().waitFor();
@@ -68,9 +71,29 @@ try{
  await page.locator('#cr-reset').click();
  await page.locator('#cr-sort').selectOption('count');
  assert.match(await cards.first().innerText(),/Ficção/);
- const animeImage=await page.locator('.atlas-showcase').filter({has:page.getByRole('heading',{name:'Biblioteca de animes',exact:true})}).screenshot({path:'artifacts/animes.png'});
- const comparison=await browser.newPage({viewport:{width:1600,height:1120}});
- await comparison.setContent('<body style="margin:0;background:#0b1019;display:flex;gap:12px;align-items:flex-start"><img width="790" src="data:image/png;base64,'+mangaImage.toString('base64')+'"><img width="790" src="data:image/png;base64,'+animeImage.toString('base64')+'"></body>');
- await comparison.screenshot({path:'artifacts/mangas-animes.png',fullPage:true});
+ const animeText=await cards.first().locator('.atlas-library-series>div:last-child').boundingBox();
+ const animeCover=await cards.first().locator('.atlas-anime-cover').boundingBox();
+ assert.ok(animeText.x-(animeCover.x+animeCover.width)<25,'Texto deve ficar junto à capa');
+ assert.ok(animeText.width>animeCover.width*2,'Texto deve ocupar a largura disponível');
+ const animeImage=await page.locator('.cr-anime-grid').screenshot({path:'artifacts/animes.png'});
+
+ const old=await browser.newPage({viewport:{width:900,height:1000}});
+ await old.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
+ await old.goto('http://127.0.0.1:'+server.address().port+'/before');
+ await old.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
+ await old.locator('button[data-menu=mangas]').click();
+ await old.locator('[data-layout=list]').click();
+ await old.locator('#sort').selectOption('title');
+ const oldManga=await old.locator('#grid').screenshot();
+ await old.locator('button[data-menu=animes]').click();
+ await old.locator('.cr-anime-card').first().waitFor();
+ await old.locator('#cr-sort').selectOption('count');
+ const oldAnime=await old.locator('.cr-anime-grid').screenshot();
+ const comparison=await browser.newPage({viewport:{width:1820,height:1000}});
+ for(const [name,before,after] of [['mangas',oldManga,mangaImage],['animes',oldAnime,animeImage]]){
+  const panel=(label,png)=>'<section style="width:50%"><h2>'+label+'</h2><img style="display:block;width:100%" src="data:image/png;base64,'+png.toString('base64')+'"></section>';
+  await comparison.setContent('<main style="margin:0;background:#0b1019;color:white;font:16px system-ui;display:flex;gap:12px;padding:12px;align-items:flex-start">'+panel('Antes · site publicado',before)+panel('Depois · PR #2',after)+'</main>');
+  await comparison.locator('main').screenshot({path:'artifacts/comparativo-'+name+'.png'});
+ }
  console.log('Chromium: progresso, filtros, ordenação e modos nas duas bibliotecas.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
