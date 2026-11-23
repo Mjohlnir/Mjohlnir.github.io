@@ -510,7 +510,7 @@ $('sync').onclick=async()=>{const btn=$('sync');btn.disabled=true;btn.classList.
 </script>
 <script>
 (function(){
-let records=[],loaded=false,sort='count',query='',filter='all',year='all',expanded=null;
+let records=[],loaded=false,sort='score',query='',filter='all',year='all',expanded=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date=s=>s?new Date(s).toLocaleDateString('pt-BR',{timeZone:'UTC'}):'—';
 const root=()=>document.getElementById('crunchyrollview');
@@ -544,25 +544,74 @@ const episodeThumb=(g,r)=>{
 const coverImg=(g,cl='')=>{const thumb=latestRow(g)?.thumbnail||'';const url=cl==='episode'?thumb:(coverCache[g.id]?.url||thumb);return `<div class="atlas-anime-cover ${cl}" data-cover-id="${esc(g.id)}">${url?`<img loading="lazy" src="${esc(url)}" alt="Imagem de ${esc(g.title)}">`:'<span class="atlas-cover-fallback">MANGA<br>ATLAS</span>'}</div>`};
 function fillCover(g){const item=coverCache[g.id];if(!item?.url)return;root().querySelectorAll('[data-cover-id]').forEach(el=>{if(el.dataset.coverId!==g.id||el.classList.contains('episode'))return;el.innerHTML=`<img loading="lazy" src="${esc(item.url)}" alt="Capa de ${esc(g.title)}">`})}
 let resolving=false;
-async function resolveCovers(gs){if(resolving)return;resolving=true;const todo=gs.filter(g=>!Object.prototype.hasOwnProperty.call(coverCache,g.id)).slice(0,24);for(let i=0;i<todo.length;i+=5){const chunk=todo.slice(i,i+5);try{const query=`query { ${chunk.map((g,j)=>`a${j}: Page(perPage:6){media(search:${JSON.stringify(g.title)},type:ANIME){id title{english romaji native}synonyms coverImage{large} siteUrl}}`).join(' ')} }`;const resp=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query})});if(!resp.ok)throw Error('AniList '+resp.status);const json=await resp.json();chunk.forEach((g,j)=>{let choices=json.data?.['a'+j]?.media||[];let key=normalize(g.title);let match=choices.find(m=>[m.title?.english,m.title?.romaji,m.title?.native,...(m.synonyms||[])].some(t=>normalize(t)===key));coverCache[g.id]=match?{url:match.coverImage?.large||'',id:match.id}:null;fillCover(g)});try{localStorage.setItem('atlasAnimeCoversV20',JSON.stringify(coverCache))}catch{}}catch(e){console.warn('Capas AniList indisponíveis:',e.message);break}}
-resolving=false}
+async function resolveCovers(gs){
+ if(resolving)return;resolving=true;
+ const todo=gs.filter(g=>!coverCache[g.id]||!Object.prototype.hasOwnProperty.call(coverCache[g.id],'averageScore')).slice(0,36);
+ for(let i=0;i<todo.length;i+=4){
+  const chunk=todo.slice(i,i+4);
+  try{
+   const q=`query { ${chunk.map((g,j)=>`a${j}: Page(perPage:6){media(search:${JSON.stringify(g.title)},type:ANIME){id title{english romaji native}synonyms coverImage{large} siteUrl averageScore genres format seasonYear status episodes popularity}}`).join(' ')} }`;
+   const resp=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+   if(!resp.ok)throw Error('AniList '+resp.status);
+   const data=(await resp.json()).data||{};
+   chunk.forEach((g,j)=>{
+    const candidates=data['a'+j]?.media||[],key=normalize(g.title);
+    const match=candidates.find(m=>[m.title?.english,m.title?.romaji,m.title?.native,...(m.synonyms||[])].some(t=>normalize(t)===key));
+    if(match)coverCache[g.id]={url:match.coverImage?.large||'',id:match.id,averageScore:match.averageScore,genres:match.genres,format:match.format,seasonYear:match.seasonYear,status:match.status,episodes:match.episodes,popularity:match.popularity,siteUrl:match.siteUrl};
+    else coverCache[g.id]={url:null,averageScore:null,unmatched:true};
+    fillCover(g);
+   });
+   try{localStorage.setItem('atlasAnimeCoversV20',JSON.stringify(coverCache))}catch{}
+   paintAnimeRatings();
+  }catch(e){console.warn('Metadados AniList indisponíveis:',e.message);break}
+ }
+ resolving=false;
+}
+const animeScore=g=>Number(coverCache[g.id]?.averageScore)||0;
+const animeMeta=g=>coverCache[g.id]||{};
+const animePoster=(g)=>coverImg(g,'poster');
+function paintAnimeRatings(){
+ const el=root()?.querySelector('#atlas-anime-ranked-library');if(!el)return;
+ const matched=bySeries().filter(g=>animeScore(g)>0).sort((a,b)=>animeScore(b)-animeScore(a)).slice(0,12);
+ el.innerHTML=matched.length?matched.map(g=>`<button class="atlas-ranked-card" data-quick-series="${esc(g.id)}">${animePoster(g)}<strong>${esc(g.title)}</strong><small>★ ${(animeScore(g)/10).toFixed(1)} / 10 · AniList</small></button>`).join(''):'<p class="muted">Associando seus animes aos registros do AniList. Títulos ainda não identificados não recebem notas estimadas.</p>';
+ el.querySelectorAll('[data-quick-series]').forEach(b=>b.onclick=()=>window.atlasOpenAnimeQuick?.(b.dataset.quickSeries));
+ root().querySelectorAll('[data-score-series]').forEach(el=>{const g=bySeries().find(x=>x.id===el.dataset.scoreSeries);if(g&&animeScore(g))el.textContent='★ '+(animeScore(g)/10).toFixed(1)+' / 10 · AniList'});
+}
+let topCache=null,topLoading=false;
+async function loadTopAnime(){
+ if(topCache||topLoading)return;topLoading=true;
+ try{
+  const query=`query { Page(page:1,perPage:16){media(type:ANIME,sort:SCORE_DESC,isAdult:false){id title{english romaji}coverImage{large} averageScore siteUrl format seasonYear}}`;
+  const res=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:query+'}'})});
+  if(!res.ok)throw Error('AniList HTTP '+res.status);
+  const data=await res.json();if(data.errors?.length)throw Error(data.errors[0].message);
+  topCache=data.data?.Page?.media||[];
+  paintTopAnime();
+ }catch(e){const el=root()?.querySelector('#atlas-anime-top');if(el)el.innerHTML='<p class="muted">Ranking do AniList temporariamente indisponível.</p>'}finally{topLoading=false}
+}
+function paintTopAnime(){
+ const el=root()?.querySelector('#atlas-anime-top');if(!el||!topCache)return;
+ el.innerHTML=topCache.map(m=>`<a class="atlas-ranked-card" href="${esc(m.siteUrl||'https://anilist.co/anime/'+m.id)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(m.coverImage?.large||'')}" alt=""><strong>${esc(m.title?.english||m.title?.romaji||'Sem título')}</strong><small>★ ${m.averageScore==null?'Sem nota':(m.averageScore/10).toFixed(1)+' / 10'} · AniList</small></a>`).join('');
+}
 const currentSeason=()=>{const d=new Date(),m=d.getMonth()+1;return {year:d.getFullYear(),season:m<=3?'WINTER':m<=6?'SPRING':m<=9?'SUMMER':'FALL'}};
 let seasonCache=null,seasonLoading=false;
 async function loadSeason(){if(seasonCache||seasonLoading)return;seasonLoading=true;let {year,season}=currentSeason();try{const query=`query($year:Int,$season:MediaSeason){Page(page:1,perPage:18){media(type:ANIME,seasonYear:$year,season:$season,sort:POPULARITY_DESC){id title{romaji english}coverImage{large}averageScore episodes format siteUrl}}}`;const res=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,variables:{year,season}})});if(!res.ok)throw Error('HTTP '+res.status);seasonCache=res.ok?(await res.json()).data?.Page?.media||[]:[];paintSeason()}catch(e){const el=root().querySelector('#atlas-season-list');if(el)el.innerHTML='<p class="muted">Não foi possível consultar os lançamentos do AniList neste momento.</p>'}finally{seasonLoading=false}}
 function paintSeason(){let el=root().querySelector('#atlas-season-list');if(!el||!seasonCache)return;el.innerHTML=seasonCache.map(m=>`<a class="atlas-season-item" href="${esc(m.siteUrl||'https://anilist.co/anime/'+m.id)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(m.coverImage?.large||'')}" alt=""><strong>${esc(m.title?.english||m.title?.romaji||'Sem título')}</strong><small>${esc(m.format||'Anime')} · ${m.averageScore==null?'Sem nota':m.averageScore+' / 100'}</small></a>`).join('')}
 function render(){if(!loaded)return;const groups=bySeries(),recent=groups.slice().sort((a,b)=>(latestRow(b)?.date||'').localeCompare(latestRow(a)?.date||''));const years=[...new Set(records.map(r=>(r.date||'').slice(0,4)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));const n=records.length,done=records.filter(r=>r.completed).length,unknown=records.filter(r=>!r.metadata).length;
 let filtered=groups.filter(g=>(filter==='all'||filter==='complete'&&g.complete===g.rows.length||filter==='partial'&&g.complete<g.rows.length||filter==='unknown'&&g.rows.some(r=>!r.metadata))&&(year==='all'||g.years.has(year))&&(g.title.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))));
-filtered.sort((a,b)=>sort==='alpha'?a.title.localeCompare(b.title,'pt-BR'):sort==='recent'?(latestRow(b)?.date||'').localeCompare(latestRow(a)?.date||''):b.rows.length-a.rows.length);
+filtered.sort((a,b)=>sort==='score'?(animeScore(b)-animeScore(a)||b.rows.length-a.rows.length):sort==='alpha'?a.title.localeCompare(b.title,'pt-BR'):sort==='recent'?(latestRow(b)?.date||'').localeCompare(latestRow(a)?.date||''):b.rows.length-a.rows.length);
 const recentCard=g=>{const r=latestRow(g);return `<button class="atlas-recent-card" data-quick-series="${esc(g.id)}">${episodeThumb(g,r)}<span class="atlas-recent-text"><b>${esc(g.title)}</b><small>${r.metadata?'T'+(r.season??'?')+' · Episódio '+(r.episode??'?'):'Episódio não identificado'}${r.title?' · '+esc(r.title):''}</small><small>${date(r.date)} · ${r.completed?'Assistido':(watchInfo(r).label||'Progresso indisponível')}</small></span></button>`};
-root().innerHTML=`<div class="cr-hero"><div class="eyebrow">ANIMES</div><h1>Sua biblioteca de animes</h1></div>
-<section class="atlas-showcase"><div class="atlas-section-heading"><h2>Assistidos recentemente</h2></div><div class="atlas-recent-featured">${recent.slice(0,6).map(recentCard).join('')}</div><div class="atlas-section-heading atlas-small-heading"><h3>Seu histórico recente</h3><div class="atlas-carousel-controls"><button type="button" data-slide="-1" aria-label="Voltar">‹</button><button type="button" data-slide="1" aria-label="Avançar">›</button></div></div><div class="atlas-recent-carousel" id="atlas-recent-carousel">${recent.slice(6,36).map(recentCard).join('')}</div></section>
+root().innerHTML=`<div class="cr-hero"><div class="eyebrow">ANIMES · MANGA ATLAS</div><h1>Sua biblioteca de animes</h1><p class="muted">Notas, rankings e lançamentos do AniList · histórico de episódios do Crunchyroll</p></div>
+<section class="atlas-showcase"><div class="atlas-section-heading"><h2>Melhores animes · AniList</h2><span class="muted">Ranking da comunidade · avaliação de 0 a 10</span></div><div id="atlas-anime-top" class="atlas-ranked-grid">${topCache?'':'<p class="muted">Consultando avaliações do AniList…</p>'}</div></section>
+<section class="atlas-showcase"><div class="atlas-section-heading"><h2>Mais bem avaliados da sua biblioteca</h2><span class="muted">Somente títulos associados com segurança ao AniList</span></div><div id="atlas-anime-ranked-library" class="atlas-ranked-grid"></div></section>
 <section class="atlas-showcase"><div class="atlas-section-heading"><h2>Em exibição nesta temporada</h2><span class="muted">AniList · ${currentSeason().season==='FALL'?'Outono':currentSeason().season==='WINTER'?'Inverno':currentSeason().season==='SPRING'?'Primavera':'Verão'} ${currentSeason().year}</span></div><div id="atlas-season-list" class="atlas-season-grid">${seasonCache?'':'<p class="muted">Consultando os lançamentos no AniList…</p>'}</div></section>
-<div class="cr-kpis"><div><strong>${n.toLocaleString('pt-BR')}</strong><small>Reproduções registradas</small></div><div><strong>${groups.length}</strong><small>Séries / identificadores</small></div><div><strong>${done.toLocaleString('pt-BR')}</strong><small>Marcadas como concluídas</small></div><div><strong>${unknown}</strong><small>Sem metadados</small></div></div><div class="atlas-section-heading"><h2>Biblioteca completa</h2><span class="muted">${filtered.length} séries / identificadores</span></div><div class="cr-controls"><input id="cr-search" placeholder="Buscar série…" value="${esc(query)}"><select id="cr-year"><option value="all">Todos os anos</option>${years.map(y=>`<option value="${y}" ${year===y?'selected':''}>${y}</option>`).join('')}</select><select id="cr-filter"><option value="all">Todos os registros</option><option value="complete" ${filter==='complete'?'selected':''}>Todas as reproduções concluídas</option><option value="partial" ${filter==='partial'?'selected':''}>Com reproduções não concluídas</option><option value="unknown" ${filter==='unknown'?'selected':''}>Com metadados ausentes</option></select><select id="cr-sort"><option value="count" ${sort==='count'?'selected':''}>Mais reproduções</option><option value="recent" ${sort==='recent'?'selected':''}>Mais recentes</option><option value="alpha" ${sort==='alpha'?'selected':''}>Nome A–Z</option></select></div><div class="cr-list cr-anime-grid">${filtered.map(g=>{let r=latestRow(g);return `<article class="cr-item cr-anime-card"><button class="cr-series atlas-library-series" data-quick-series="${esc(g.id)}">${coverImg(g)}<div><span class="cr-anime-type">ANIME · CRUNCHYROLL</span><strong>${esc(g.title)}</strong><small>${g.rows.length} reproduções · ${g.complete} concluídas</small><small>Último: ${r.metadata?'T'+(r.season??'?')+' · EP '+(r.episode??'?'):'sem identificação'} · ${date(r.date)}</small></div></button><button class="atlas-episode-toggle" data-series="${esc(g.id)}">${expanded===g.id?'Ocultar episódios −':'Ver episódios +'}</button>${expanded===g.id?`<div class="cr-episodes"><div class="cr-episode cr-head"><span>Data</span><span>Temporada / Episódio</span><span>Situação</span></div>${g.rows.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(r=>`<div class="cr-episode"><span>${date(r.date)}</span><span>${r.metadata?'T'+(r.season??'?')+' · EP '+(r.episode??'?'):'Metadados indisponíveis'} <small>${esc(r.title||r.id)}</small></span><span>${r.completed?'Concluída':'Não concluída'}</span></div>`).join('')}</div>`:''}</article>`}).join('')}</div>`;
+<section class="atlas-showcase"><div class="atlas-section-heading"><h2>Biblioteca de animes</h2><span class="muted">${filtered.length} séries identificadas no histórico</span></div><div class="cr-controls"><input id="cr-search" placeholder="Buscar anime…" value="${esc(query)}"><select id="cr-year"><option value="all">Todos os anos</option>${years.map(y=>`<option value="${y}" ${year===y?'selected':''}>${y}</option>`).join('')}</select><select id="cr-filter"><option value="all">Todos os registros</option><option value="complete" ${filter==='complete'?'selected':''}>Episódios concluídos</option><option value="partial" ${filter==='partial'?'selected':''}>Episódios pendentes</option><option value="unknown" ${filter==='unknown'?'selected':''}>Metadados ausentes</option></select><select id="cr-sort"><option value="score" ${sort==='score'?'selected':''}>Melhor avaliação AniList</option><option value="count" ${sort==='count'?'selected':''}>Mais reproduções</option><option value="recent" ${sort==='recent'?'selected':''}>Mais recentes</option><option value="alpha" ${sort==='alpha'?'selected':''}>Nome A–Z</option></select></div><div class="cr-list cr-anime-grid">${filtered.map(g=>{let r=latestRow(g);return `<article class="cr-item cr-anime-card"><button class="cr-series atlas-library-series" data-quick-series="${esc(g.id)}">${coverImg(g)}<div><span class="cr-anime-type">ANIME · CRUNCHYROLL</span><strong>${esc(g.title)}</strong><small data-score-series="${esc(g.id)}">${animeScore(g)?'★ '+(animeScore(g)/10).toFixed(1)+' / 10 · AniList':'Nota AniList não vinculada'}</small><small>${g.rows.length} reproduções · ${g.complete} concluídas</small><small>Último: ${r.metadata?'T'+(r.season??'?')+' · EP '+(r.episode??'?'):'sem identificação'} · ${date(r.date)}</small></div></button><button class="atlas-episode-toggle" data-series="${esc(g.id)}">${expanded===g.id?'Ocultar episódios −':'Ver episódios +'}</button>${expanded===g.id?`<div class="cr-episodes">${g.rows.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(r=>`<div class="atlas-anime-episode-row">${episodeThumb(g,r)}<div><b>${r.metadata?'T'+(r.season??'?')+' · EP '+(r.episode??'?'):'Episódio não identificado'}</b><small>${esc(r.title||'')}</small><small>${date(r.date)} · ${r.completed?'Assistido':(watchInfo(r).label||'Progresso indisponível')}</small></div></div>`).join('')}</div>`:''}</article>`}).join('')}</div></section>
+<section class="atlas-showcase atlas-history-bottom"><div class="atlas-section-heading"><h2>Seu histórico Crunchyroll</h2><span class="muted">Reproduções e progresso real dos episódios</span></div><div class="cr-kpis"><div><strong>${n.toLocaleString('pt-BR')}</strong><small>Reproduções</small></div><div><strong>${groups.length}</strong><small>Séries / identificadores</small></div><div><strong>${done.toLocaleString('pt-BR')}</strong><small>Concluídas</small></div><div><strong>${unknown}</strong><small>Sem metadados</small></div></div><div class="atlas-section-heading atlas-small-heading"><h3>Assistidos recentemente</h3></div><div class="atlas-recent-featured">${recent.slice(0,6).map(recentCard).join('')}</div><div class="atlas-section-heading atlas-small-heading"><h3>Outras reproduções recentes</h3><div class="atlas-carousel-controls"><button type="button" data-slide="-1" aria-label="Voltar">‹</button><button type="button" data-slide="1" aria-label="Avançar">›</button></div></div><div class="atlas-recent-carousel" id="atlas-recent-carousel">${recent.slice(6,36).map(recentCard).join('')}</div></section>`;
 root().querySelector('#cr-search').oninput=e=>{query=e.target.value;let p=e.target.selectionStart;render();let el=root().querySelector('#cr-search');el.focus();el.setSelectionRange(p,p)};
 root().querySelector('#cr-year').onchange=e=>{year=e.target.value;render()};root().querySelector('#cr-filter').onchange=e=>{filter=e.target.value;render()};root().querySelector('#cr-sort').onchange=e=>{sort=e.target.value;render()};root().querySelectorAll('[data-series]').forEach(b=>b.onclick=()=>{expanded=expanded===b.dataset.series?null:b.dataset.series;render()});
 root().querySelectorAll('[data-quick-series]').forEach(b=>b.onclick=()=>{if(window.atlasOpenAnimeQuick)window.atlasOpenAnimeQuick(b.dataset.quickSeries)});
 root().querySelectorAll('[data-slide]').forEach(b=>b.onclick=()=>root().querySelector('#atlas-recent-carousel').scrollBy({left:Number(b.dataset.slide)*650,behavior:'smooth'}));
-paintSeason();loadSeason();resolveCovers([...recent.slice(0,12),...filtered.slice(0,12)]);
+paintSeason();paintTopAnime();paintAnimeRatings();loadSeason();loadTopAnime();resolveCovers([...filtered,...recent]);
 }
 
 function show(){document.getElementById('mainContent').classList.add('hidden');document.getElementById('detailPage').classList.add('hidden');root().classList.remove('hidden');load()}
@@ -970,4 +1019,21 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
 }
 #atlas-private .progress-wrap .profile-progress.finished i{background:linear-gradient(90deg,#1fa950,#77ed76)}
 #atlas-private .progress-wrap .progress-caption{font-size:11px;line-height:1.45;color:#a8c9d1}
+</style><style id="atlas-anime-unified-v22">
+#atlas-private #crunchyrollview .cr-hero{margin-bottom:25px}
+#atlas-private #crunchyrollview .atlas-showcase{margin:0 0 30px;padding:22px;background:#141d2b;border:1px solid #2a384b;border-radius:14px}
+#atlas-private #crunchyrollview .atlas-section-heading h2{font-size:21px;margin:0}
+#atlas-private #crunchyrollview .atlas-ranked-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:14px;margin-top:16px}
+#atlas-private #crunchyrollview .atlas-ranked-card{min-width:0;text-align:left;text-decoration:none;background:transparent;border:0;padding:0;color:#edf3fb;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+#atlas-private #crunchyrollview .atlas-ranked-card img,#atlas-private #crunchyrollview .atlas-ranked-card .atlas-anime-cover{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:9px}
+#atlas-private #crunchyrollview .atlas-ranked-card strong{font-size:12px;line-height:1.4}
+#atlas-private #crunchyrollview .atlas-ranked-card small{font-size:11px;color:#86dbce}
+#atlas-private #crunchyrollview .atlas-ranked-card:hover img,#atlas-private #crunchyrollview .atlas-ranked-card:hover .atlas-anime-cover{outline:2px solid #43c9bf}
+#atlas-private #crunchyrollview .atlas-anime-episode-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;padding:12px;border-top:1px solid #304155;align-items:center}
+#atlas-private #crunchyrollview .atlas-anime-episode-row .atlas-episode-thumb{aspect-ratio:16/9}
+#atlas-private #crunchyrollview .atlas-anime-episode-row b,#atlas-private #crunchyrollview .atlas-anime-episode-row small{display:block}
+#atlas-private #crunchyrollview .atlas-anime-episode-row small{color:#a6b7c6;margin-top:5px}
+#atlas-private #crunchyrollview .atlas-history-bottom{border-top:2px solid #2d5555}
+@media(max-width:1100px){#atlas-private #crunchyrollview .atlas-ranked-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:650px){#atlas-private #crunchyrollview .atlas-ranked-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}#atlas-private #crunchyrollview .atlas-showcase{padding:13px}#atlas-private #crunchyrollview .atlas-anime-episode-row{grid-template-columns:112px minmax(0,1fr);gap:8px}}
 </style><script type="module" src="atlas-cloud.js"></script></body></html>
