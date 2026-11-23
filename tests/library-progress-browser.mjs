@@ -106,5 +106,18 @@ try{
  });
  assert.match(await manga('Berserk').innerText(),/364\/390.*93,33%/);
  assert.match(await manga('Kingdom').innerText(),/773\/800.*96,63%/);
+ await page.evaluate(()=>{
+  const original=window.atlasCloud.fetch;
+  window.atlasChapterRequests=0;
+  window.atlasCloud.fetch=async(path,options)=>{
+   if(path!=='/api/capitulos-fontes/atualizar')return original(path,options);
+   const n=++window.atlasChapterRequests;
+   return Response.json({references:n===1?{1:{original_chapters:400}}:{},checked:3,pending:n===1?1:0});
+  };
+ });
+ await page.locator('#catalogview [data-refresh-chapter-references]').click();
+ await page.locator('#catalogview [data-chapter-refresh-result]').getByText(/6 obras verificadas/).waitFor();
+ assert.equal(await page.evaluate(()=>window.atlasChapterRequests),2);
+ assert.match(await manga('Berserk').innerText(),/364\/400.*91%/);
  console.log('Chromium: progresso, filtros, ordenação e modos nas duas bibliotecas.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

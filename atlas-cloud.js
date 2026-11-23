@@ -29,7 +29,7 @@ async function related(id){const data=await gql('query($id:Int){Media(id:$id,typ
 
 // Capítulos: consulta autenticada à Edge Function. O banco armazena o cache;
 // números de traduções nunca são tratados como publicação original.
-async function chapterCloudReferences(){
+async function chapterCloudReferences(includeSummary=false){
  const {data:{session}}=await db.auth.getSession();
  if(!session?.access_token)throw Error('Sessão expirada');
  const response=await fetch(cfg.supabaseUrl+'/functions/v1/atlas-chapters',{
@@ -59,7 +59,7 @@ async function chapterCloudReferences(){
    translationSource:r.translation_source
   };
  }
- return out;
+ return includeSummary?{references:out,checked:Number(payload.updated)||0,pending:Number(payload.pending)||0}:out;
 }
 async function atlasFetch(url,options={}){try{const path=String(url),method=String(options?.method||'GET').toUpperCase(),body=options?.body?JSON.parse(options.body):null;if(!account)throw Error('Acesso não autenticado.');
  if(path==='historico_crunchyroll.json')return json(watchPayload());
@@ -70,6 +70,7 @@ async function atlasFetch(url,options={}){try{const path=String(url),method=Stri
  if(path==='/api/avaliacoes')return json(method==='POST'?await ratingsSave(body):await ratingsGet());
  if(path==='/api/capitulos-referencia')return json(method==='POST'?(await setPref('chapter_refs',body),{ok:true}):await pref('chapter_refs'));
  if(path==='/api/capitulos-fontes')return json(await chapterCloudReferences());
+ if(path==='/api/capitulos-fontes/atualizar'&&method==='POST')return json(await chapterCloudReferences(true));
  if(path.startsWith('/api/capitulos-consultar/')){const all=await chapterCloudReferences();return json(all[path.split('/').pop()]||{error:'Referência ainda não disponível'});}
  if(path==='/api/atividades'||path==='/api/atividades/atualizar')return json(await activityFeed());
  if(path.startsWith('/api/relacionados/'))return json(await related(path.split('/').pop()));
