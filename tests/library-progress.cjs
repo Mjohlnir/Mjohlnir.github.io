@@ -49,3 +49,18 @@ test('scripts clássicos do site compilam e ambos os catálogos usam o component
  assert.match(html,/\$\{progressMarkup\(e\)\}/);
  assert.match(html,/\$\{animeProgress\(g\)\}/);
 });
+
+test('usa capítulos já publicados para qualquer obra em andamento',()=>{
+ const user={progress:364,status:'CURRENT',media:{status:'RELEASING'}};
+ assert.equal(manga(user,null,{original_chapters:390,translated_chapters:385}).percent,100*(364/390));
+ assert.match(meter(manga(user,null,{original_chapters:390}),{unit:'capítulos lidos'}),/364\/390.*93,33%/);
+ assert.match(meter(manga(user,null,{translated_chapters:390}),{unit:'capítulos lidos'}),/publicados · tradução/);
+});
+test('usa episódios já exibidos em vez do total planejado de anime',()=>{
+ const count=atlasLibrary.publishedAnime({status:'RELEASING',episodes:24,nextAiringEpisode:{episode:10}});
+ assert.equal(count,9);
+ assert.equal(atlasLibrary.publishedAnime({status:'RELEASING',episodes:24}),null);
+ assert.equal(atlasLibrary.publishedAnime({status:'FINISHED',episodes:24}),24);
+ const rows=[{completed:true,season:1,episode:1},{completed:true,season:1,episode:1}];
+ assert.equal(anime(rows,{confirmed:true,season:1,episodes:count}).percent,100*(1/9));
+});

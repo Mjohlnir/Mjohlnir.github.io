@@ -38,14 +38,19 @@ async function chapterCloudReferences(){
   body:'{}'
  });
  const payload=await response.json();
- if(!response.ok)throw Error(payload.error||'Falha ao consultar capítulos');
+ if(!response.ok){
+  if(/permission denied.*chapter_references/i.test(payload.error||''))throw Error('O Supabase ainda não permite consultar o catálogo de capítulos publicados.');
+  throw Error(payload.error||'Falha ao consultar capítulos');
+ }
  const out={};
  for(const [id,r] of Object.entries(payload.references||{})){
   const orig=Number(r.original_chapters)||null,translated=Number(r.translated_chapters)||null;
   out[id]={
    chapter:orig,
+   original_chapters:orig,translated_chapters:translated,
+   original_source:r.original_source,translation_source:r.translation_source,
    source:orig?r.original_source:'Publicação original não confirmada',
-   confidence:orig?'Total de obra concluída':'Não utilizar traduções como total publicado',
+   confidence:orig?'Referência da publicação original':'Publicação original não confirmada',
    checkedAt:r.checked_at,
    mangadex:translated?{chapter:translated,url:r.translation_url}:null,
    mangaupdates:null,
@@ -116,6 +121,7 @@ async function animeProgressSave(id,value){
  const saved={userStatus:value.userStatus==='COMPLETED'?'COMPLETED':null};
  if(value.confirmed===true&&Number.isInteger(value.season)&&value.season>=0&&Number.isInteger(value.episodes)&&value.episodes>0){
   Object.assign(saved,{confirmed:true,season:value.season,episodes:value.episodes});
+  if(Number.isSafeInteger(value.anilistId)&&value.anilistId>0)saved.anilistId=value.anilistId;
  }
  await setPref('anime-progress:'+id,saved);
  return saved;

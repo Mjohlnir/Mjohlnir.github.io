@@ -17,6 +17,12 @@
   const n=num(current), denominator=positive(total), amount=n===null?null:Math.max(0,n);
   return {amount,total:denominator,complete,caughtUp:!complete&&denominator!==null&&amount!==null&&amount>=denominator,percent:complete?100:amount===null||denominator===null?null:Math.min(100,100*(amount/denominator))};
  }
+ function publishedAnime(media){
+  if(media?.status==='FINISHED')return positive(media.episodes);
+  if(media?.status!=='RELEASING')return null;
+  const next=positive(media.nextAiringEpisode?.episode);
+  return next>1?next-1:null;
+ }
  function manga(entry,manual,source={}){
   const media=entry?.media||{};
   const original=positive(source.original_chapters??source.originalChapters??source.original?.chapter);
@@ -66,5 +72,5 @@
   return groups.filter(group=>state(group)&&(year==='all'||group.years.has(year))&&matches(query,[group.title]))
    .sort((a,b)=>(sort==='score'?score(b)-score(a):sort==='recent'?latest(b).localeCompare(latest(a)):sort==='count'?b.rows.length-a.rows.length:0)||collator.compare(a.title,b.title));
  }
- globalThis.atlasLibrary={progress,manga,anime,meter,matches,collator,layouts,buttons,animeLibrary,animeMetadata:new Map()};
+ globalThis.atlasLibrary={progress,publishedAnime,manga,anime,meter,matches,collator,layouts,buttons,animeLibrary,animeMetadata:new Map()};
 })();
