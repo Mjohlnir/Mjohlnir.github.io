@@ -75,6 +75,7 @@ try{
  const animeCover=await cards.first().locator('.atlas-anime-cover').boundingBox();
  assert.ok(animeText.x-(animeCover.x+animeCover.width)<25,'Texto deve ficar junto à capa');
  assert.ok(animeText.width>animeCover.width*2,'Texto deve ocupar a largura disponível');
+ await page.locator('[data-anime-layout=large]').click();
  const animeImage=await page.locator('.cr-anime-grid').screenshot({path:'artifacts/animes.png'});
 
  const old=await browser.newPage({viewport:{width:900,height:1000}});
