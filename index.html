@@ -384,6 +384,7 @@ function atlasApplyBanner(){
  if(!header)return;
  const url=atlasBannerImage();
  header.style.setProperty('--atlas-profile-art',url?'url('+JSON.stringify(url)+')':'none');
+ header.style.backgroundPosition='center '+(Number.isFinite(Number(atlasBannerPreference.position))?atlasBannerPreference.position:50)+'%';
 }
 async function atlasLoadBanner(){
  if(atlasBannerLoading||atlasBannerLoaded||!window.atlasCloud?.bannerRead)return;
