@@ -592,7 +592,7 @@ const coverImg=(g,cl='')=>{const thumb=latestRow(g)?.thumbnail||'';const url=cl=
 function fillCover(g){const item=coverCache[g.id];if(!item?.url)return;root().querySelectorAll('[data-cover-id]').forEach(el=>{if(el.dataset.coverId!==g.id||el.classList.contains('episode'))return;el.innerHTML=`<img loading="lazy" src="${esc(item.url)}" alt="Capa de ${esc(g.title)}">`})}
 let resolving=false;
 async function resolveCovers(gs){
- if(resolving)return;resolving=true;
+ if(resolving)return;resolving=true;let updated=false;
  const todo=gs.filter(g=>!coverCache[g.id]||!Object.prototype.hasOwnProperty.call(coverCache[g.id],'averageScore')).slice(0,36);
  for(let i=0;i<todo.length;i+=4){
   const chunk=todo.slice(i,i+4);
@@ -606,14 +606,14 @@ async function resolveCovers(gs){
     const match=candidates.find(m=>[m.title?.english,m.title?.romaji,m.title?.native,...(m.synonyms||[])].some(t=>normalize(t)===key));
     if(match)coverCache[g.id]={url:match.coverImage?.large||'',id:match.id,averageScore:match.averageScore,genres:match.genres,format:match.format,seasonYear:match.seasonYear,status:match.status,episodes:match.episodes,popularity:match.popularity,siteUrl:match.siteUrl};
     else coverCache[g.id]={url:null,averageScore:null,unmatched:true};
-    fillCover(g);
+    fillCover(g);updated=true;
    });
    try{localStorage.setItem('atlasAnimeCoversV20',JSON.stringify(coverCache))}catch{}
    paintAnimeRatings();
   }catch(e){console.warn('Metadados AniList indisponíveis:',e.message);break}
  }
  resolving=false;
- if(todo.length&&sort==='score'&&loaded&&root()&&!root().classList.contains('hidden'))render();
+ if(updated&&sort==='score'&&loaded&&root()&&!root().classList.contains('hidden'))render();
 }
 const animeScore=g=>Number(coverCache[g.id]?.averageScore)||0;
 const animeMeta=g=>coverCache[g.id]||{};
