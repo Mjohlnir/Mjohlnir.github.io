@@ -40,11 +40,11 @@ async function activityFeed(){
   const found=new Map();
   let complete=false;
   for(let page=1;page<=8;page++){
-   const data=await gql('query($id:Int,$page:Int,$after:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} activities(userId:$id,type:MANGA_LIST,createdAt_greater:$after,sort:ID_DESC){... on ListActivity{id createdAt status progress media{id type title{romaji english native} coverImage{extraLarge large medium}}}}}}',{id,page,after:cutoff-1});
+   const data=await gql('query($id:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} activities(userId:$id,type:MANGA_LIST,sort:ID_DESC){... on ListActivity{id createdAt status progress media{id type title{romaji english native} coverImage{extraLarge large medium}}}}}}',{id,page});
    assertOwner();
    if(!data.Page||!Array.isArray(data.Page.activities))throw Error('Feed de atividades indisponível.');
    for(const item of data.Page.activities)if(item?.media?.type==='MANGA'&&item.id)found.set(item.id,item);
-   if(!data.Page.pageInfo?.hasNextPage){complete=true;break;}
+   if(!data.Page.pageInfo?.hasNextPage||data.Page.activities.some(item=>item?.createdAt>0&&item.createdAt<cutoff)){complete=true;break;}
   }
   return {source:'AniList',activities:[...found.values()],partial:!complete,fetchedAt:new Date().toISOString()};
  }catch(e){return {activities:[],error:e.message};}

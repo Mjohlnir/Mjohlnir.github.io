@@ -461,7 +461,7 @@ function renderProfile(){
  const max=Math.max(...top.map(x=>x[1].count),1);
  const activities=(activityFeed?.activities||[]).filter(a=>a.media?.type==='MANGA').sort((a,b)=>b.createdAt-a.createdAt);
  const recent=activities.filter(a=>(a.status||'').toLowerCase().includes('read')||(a.status||'').toLowerCase().includes('completed')).slice(0,5);
- const dashboard=atlasDashboard.renderActivity(activities.map(a=>({date:activityDate(a),hasTime:true})),{source:activityFeed?.partial?'AniList · mangás · amostra limitada':'AniList · mangás',loading:!activityFeed,error:activityFeed?.error});
+ const dashboard=atlasDashboard.renderActivity(activities.map(a=>({date:activityDate(a),hasTime:true})),{source:activityFeed?.partial?'AniList · mangás · período parcialmente coberto':'AniList · mangás',loading:!activityFeed,error:activityFeed?.error});
  const active=entries.filter(e=>e.status==='CURRENT'&&listDate(e.startedAt)).sort((a,b)=>duration(b)-duration(a)).slice(0,4);
  const counts=Object.entries(names).map(([k,v])=>({label:v,n:entries.filter(e=>e.status===k).length})).filter(x=>x.n);
  const rows=profileEntries();

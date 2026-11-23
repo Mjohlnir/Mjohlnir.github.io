@@ -36,7 +36,7 @@ const server=createServer(async(req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch();
 try{
- const page=await browser.newPage({viewport:{width:900,height:1000}});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});
  page.setDefaultTimeout(12000);
  await page.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
  await page.goto('http://127.0.0.1:'+server.address().port);
@@ -45,6 +45,8 @@ try{
  const heat=page.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap');
  await heat.waitFor();
  assert.equal(await heat.locator('button').count(),91);
+ const columns=await page.locator('.profile-layout').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
+ assert.equal(columns,3);
  const activeDay=heat.locator('.atlas-heat-4');
  await activeDay.click();
  assert.match(await page.locator('#profileview .atlas-stat-detail .atlas-dashboard-day').textContent(),/1 evento/);
@@ -57,8 +59,17 @@ try{
  await mobile.goto('http://127.0.0.1:'+server.address().port);
  await mobile.locator('button[data-menu=perfil]').click();
  await mobile.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap').waitFor();
+ assert.equal(await mobile.locator('.profile-layout').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),1);
  await mobile.locator('#profileview').screenshot({path:'artifacts/perfil-mangas-mobile.png'});
  await mobile.locator('#animeProfile').screenshot({path:'artifacts/perfil-animes-mobile.png'});
+ await mobile.evaluate(async()=>{
+  const read=window.atlasCloud.fetch;
+  window.atlasCloud.fetch=(path,options)=>path==='/api/atividades/atualizar'
+   ?Promise.reject(new Error('Serviço indisponível no teste')):read(path,options);
+ });
+ await mobile.locator('#refreshActivity').click();
+ await mobile.locator('#profileview .atlas-stat-detail .feed-error').getByText('Serviço indisponível no teste').waitFor();
+ assert.equal(await mobile.locator('#profileview .atlas-stat-detail .atlas-dashboard-heatmap').count(),0);
  await mobile.close();
  await page.locator('button[data-menu=mangas]').click();
  const manga=title=>page.locator('#grid .manga').filter({hasText:title});
@@ -108,7 +119,7 @@ try{
  await page.locator('[data-anime-layout=large]').click();
  const animeImage=await page.locator('.cr-anime-grid').screenshot({path:'artifacts/animes.png'});
 
- const old=await browser.newPage({viewport:{width:900,height:1000}});
+ const old=await browser.newPage({viewport:{width:1440,height:1000}});
  await old.route('https://**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"data":{}}'}));
  await old.goto('http://127.0.0.1:'+server.address().port+'/before');
  await old.waitForFunction(()=>typeof entries!=='undefined'&&entries.length===4);
