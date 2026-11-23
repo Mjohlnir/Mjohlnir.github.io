@@ -248,6 +248,9 @@ function profileFilters(){
 }
 function renderProfile(){
  const root=$('profileview');if(!entries.length)return;
+ // Activity entries may only contain thumbnail-size covers; reuse the full-size library cover used by the dossier.
+ const profileCovers=new Map(entries.map(e=>[String(e.media?.id),pic(e.media)]));
+ const profileCover=m=>profileCovers.get(String(m?.id))||pic(m);
  const scored=entries.filter(e=>e.score>0),average=scored.length?mean(scored.map(e=>e.score)):null;
  const genreMap={};for(const e of entries){for(const g of e.media.genres||[]){let obj=genreMap[g]??={count:0,scores:[]};obj.count++;if(e.score>0)obj.scores.push(e.score)}}
  const top=Object.entries(genreMap).sort((a,b)=>b[1].count-a[1].count).slice(0,7);
@@ -273,7 +276,7 @@ function renderProfile(){
  <section class="profile-panel"><h3>Distribuição da coleção</h3>${counts.map(x=>`<div class="genre-mini"><div><b>${x.label}</b><span>${x.n}</span></div><div class="mini-bar"><i style="width:${x.n/entries.length*100}%"></i></div></div>`).join('')}</section>
  </aside>
  <div class="profile-center">
- <section class="profile-panel"><div class="profile-panel-head"><h2>Últimas leituras no AniList</h2><button class="sync" id="refreshActivity">↻ Atualizar feed</button></div><div class="recent-strip">${recent.length?recent.map(a=>`<button class="recent-item" data-profile-id="${a.media.id}"><img loading="lazy" src="${escapeHTML(pic(a.media))}" alt=""><strong>${escapeHTML(title(a.media))}</strong><small>${escapeHTML(activityText(a))}</small><small>${niceDate(activityDate(a))}</small></button>`).join(''):`<p class="muted">${escapeHTML(activityFeed?.error||'Consultando atividades do AniList…')}</p>`}</div><div class="activity-history"><h3>Histórico recente do AniList</h3>${activities.slice(0,15).map(a=>`<button class="activity-history-item" data-profile-id="${a.media.id}"><img src="${escapeHTML(pic(a.media))}" alt=""><span><b>${escapeHTML(title(a.media))}</b><small>${escapeHTML(activityText(a))}</small></span><time>${niceDate(activityDate(a))}</time></button>`).join('')}</div></section>
+ <section class="profile-panel"><div class="profile-panel-head"><h2>Últimas leituras no AniList</h2><button class="sync" id="refreshActivity">↻ Atualizar feed</button></div><div class="recent-strip">${recent.length?recent.map(a=>`<button class="recent-item" data-profile-id="${a.media.id}"><img loading="lazy" src="${escapeHTML(profileCover(a.media))}" alt=""><strong>${escapeHTML(title(a.media))}</strong><small>${escapeHTML(activityText(a))}</small><small>${niceDate(activityDate(a))}</small></button>`).join(''):`<p class="muted">${escapeHTML(activityFeed?.error||'Consultando atividades do AniList…')}</p>`}</div><div class="activity-history"><h3>Histórico recente do AniList</h3>${activities.slice(0,15).map(a=>`<button class="activity-history-item" data-profile-id="${a.media.id}"><img src="${escapeHTML(profileCover(a.media))}" alt=""><span><b>${escapeHTML(title(a.media))}</b><small>${escapeHTML(activityText(a))}</small></span><time>${niceDate(activityDate(a))}</time></button>`).join('')}</div></section>
  <section class="profile-panel"><div class="profile-panel-head"><h2>Minha coleção</h2><span id="profileCount" class="muted">${rows.length} resultados</span></div>${profileFilters()}<div id="profileRows"></div><button class="sync" id="profileMore">Mostrar mais obras</button></section>
  </div>
  <aside class="profile-side">
