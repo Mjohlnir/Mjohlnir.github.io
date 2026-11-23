@@ -106,7 +106,7 @@ body{background:#090e16}.atlas-access{min-height:100vh;display:grid;place-items:
 @media(max-width:600px){#atlas-import{padding:24px 16px 64px}#atlas-import .atlas-import-grid article{padding:22px}#atlas-import .atlas-import-header h1{font-size:30px}}
 
 @media(max-width:900px){.atlas-import-grid{grid-template-columns:1fr}.atlas-user{display:none}.atlas-login{padding:36px 25px}}
-</style></head><body>
+ .atlas-stats-overview{margin-top:28px;max-width:1100px}.atlas-stats-overview .stats{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:15px}.atlas-stats-overview h3{margin-top:30px}.atlas-stat-detail{display:none!important}@media(max-width:700px){.atlas-stats-overview .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.profile-layout{display:block}.profile-center{min-width:0}} </style></head><body>
 <section id="atlas-access" class="atlas-access" hidden>
  <div class="atlas-login"><div class="atlas-login-symbol">◈</div><div class="atlas-login-eyebrow">SUA BIBLIOTECA, SEU UNIVERSO</div><h1>Bem-vindo ao <em>Atlas.</em></h1><p>Uma biblioteca pessoal de mangás e animes, com seus dados protegidos e sincronizados entre dispositivos.</p>
  <form id="atlas-magic-form"><label for="atlas-email">Seu e-mail</label><input id="atlas-email" type="email" autocomplete="email" placeholder="voce@exemplo.com" required maxlength="254"><button type="submit" id="atlas-magic-button">Receber link de acesso <span>→</span></button></form>
@@ -163,7 +163,7 @@ async function atlasFetchDiscover(force=false){
 function sorted(){let a=(view==='descobrir'?atlasDiscoverItems:entries).filter(matches);let s=$('sort').value;if(view==='descobrir')a.sort((x,y)=>affinity(y)-affinity(x));else a.sort((x,y)=>s==='personal'?((y.score||0)-(x.score||0)||title(x.media).localeCompare(title(y.media))):s==='public'?(y.media.averageScore||0)-(x.media.averageScore||0):s==='popular'?(y.media.popularity||0)-(x.media.popularity||0):s==='year'?(year(y.media)||0)-(year(x.media)||0):s==='progress'?(y.progress||0)-(x.progress||0):title(x.media).localeCompare(title(y.media)));return a}
 let catalogLayout='large';try{catalogLayout=localStorage.getItem('manga-atlas-layout')||'large'}catch{}
 function setCatalogLayout(mode){if(!['compact','large','list'].includes(mode))return;catalogLayout=mode;try{localStorage.setItem('manga-atlas-layout',mode)}catch{};render()}
-function render(){if(view==='perfil'){$('profileview').classList.remove('hidden');$('libraryContent').classList.add('hidden');renderProfile();return}$('profileview').classList.add('hidden');$('libraryContent').classList.remove('hidden');let n=entries.length;let current=entries.filter(x=>x.status==='CURRENT').length,completed=entries.filter(x=>x.status==='COMPLETED').length,planned=entries.filter(x=>x.status==='PLANNING').length,graded=entries.filter(x=>x.score>0).length;$('stats').innerHTML=[['Na biblioteca',n],['Lendo',current],['Concluídos',completed],['Planejados',planned],['Avaliados',graded]].map(([l,v])=>`<div class="stat"><strong>${v}</strong><span>${l}</span></div>`).join('');$('catalogview').classList.toggle('hidden',view==='estatisticas');$('statsview').classList.toggle('hidden',view!=='estatisticas');$('viewtitle').textContent=view==='descobrir'?'Descobrir novas obras':'Minha biblioteca';if(view==='descobrir'&&!atlasDiscoverLoaded&&!atlasDiscoverBusy)atlasFetchDiscover();if(view==='estatisticas'){renderGenres();return}let a=sorted();$('grid').className='grid catalog-'+catalogLayout;document.querySelectorAll('[data-layout]').forEach(b=>{b.classList.toggle('active',b.dataset.layout===catalogLayout);b.setAttribute('aria-pressed',String(b.dataset.layout===catalogLayout))});$('count').textContent=view==='descobrir'?(atlasDiscoverBusy?'Buscando novidades…':atlasDiscoverError?'Falha: '+atlasDiscoverError:`${a.length} obras fora da sua biblioteca`):`${a.length} resultados`;$('grid').innerHTML=a.slice(0,shown||48).map(e=>{let m=e.media;let val=view==='descobrir'?affinity(e).toFixed(1):e.score?e.score.toFixed(1):'—';return `<article class="manga" data-id="${m.id}" tabindex="0"><div class="poster"><div class="fallback">${escapeHTML(title(m))}</div><img loading="lazy" src="${escapeHTML(pic(m))}" alt="Capa de ${escapeHTML(title(m))}" onerror="this.style.display='none'"><span class="chip">${escapeHTML(e.status==='DISCOVER'?'Novo para você':names[e.status]||e.status)}</span></div><div class="cardbody"><div class="name">${escapeHTML(title(m))}</div><div class="sub">${escapeHTML((m.genres||[]).slice(0,3).join(' · '))}</div><div class="catalog-extra">${escapeHTML(classification(m))} · ${year(m)||'Ano indisponível'} · ${escapeHTML(publicationLabel(m.status))}<br>${e.progress||0} capítulos lidos</div><div class="scoreline"><span>★ <b>${val}</b> <span class="muted">${view==='descobrir'?'afinidade':'minha nota'}</span></span><em>◈ ${m.averageScore??'—'}</em></div></div></article>`}).join('');$('more').classList.toggle('hidden',a.length<=(shown||48));document.querySelectorAll('.manga').forEach(x=>{x.onclick=()=>openModal(Number(x.dataset.id));x.onkeydown=e=>{if(e.key==='Enter')openModal(Number(x.dataset.id))}})}
+function render(){if(view==='perfil'){$('profileview').classList.remove('hidden');$('libraryContent').classList.add('hidden');renderProfile();return}$('profileview').classList.add('hidden');$('libraryContent').classList.remove('hidden');let n=entries.length;let current=entries.filter(x=>x.status==='CURRENT').length,completed=entries.filter(x=>x.status==='COMPLETED').length,planned=entries.filter(x=>x.status==='PLANNING').length,graded=entries.filter(x=>x.score>0).length;$('stats').innerHTML=[['Na biblioteca',n],['Lendo',current],['Concluídos',completed],['Planejados',planned],['Avaliados',graded]].map(([l,v])=>`<div class="stat"><strong>${v}</strong><span>${l}</span></div>`).join('');$('catalogview').classList.toggle('hidden',view==='estatisticas');$('statsview').classList.toggle('hidden',view!=='estatisticas');$('viewtitle').textContent=view==='descobrir'?'Descobrir novas obras':'Minha biblioteca';if(view==='descobrir'&&!atlasDiscoverLoaded&&!atlasDiscoverBusy)atlasFetchDiscover();if(view==='estatisticas'){renderGenres();renderAtlasStatistics();return}let a=sorted();$('grid').className='grid catalog-'+catalogLayout;document.querySelectorAll('[data-layout]').forEach(b=>{b.classList.toggle('active',b.dataset.layout===catalogLayout);b.setAttribute('aria-pressed',String(b.dataset.layout===catalogLayout))});$('count').textContent=view==='descobrir'?(atlasDiscoverBusy?'Buscando novidades…':atlasDiscoverError?'Falha: '+atlasDiscoverError:`${a.length} obras fora da sua biblioteca`):`${a.length} resultados`;$('grid').innerHTML=a.slice(0,shown||48).map(e=>{let m=e.media;let val=view==='descobrir'?affinity(e).toFixed(1):e.score?e.score.toFixed(1):'—';return `<article class="manga" data-id="${m.id}" tabindex="0"><div class="poster"><div class="fallback">${escapeHTML(title(m))}</div><img loading="lazy" src="${escapeHTML(pic(m))}" alt="Capa de ${escapeHTML(title(m))}" onerror="this.style.display='none'"><span class="chip">${escapeHTML(e.status==='DISCOVER'?'Novo para você':names[e.status]||e.status)}</span></div><div class="cardbody"><div class="name">${escapeHTML(title(m))}</div><div class="sub">${escapeHTML((m.genres||[]).slice(0,3).join(' · '))}</div><div class="catalog-extra">${escapeHTML(classification(m))} · ${year(m)||'Ano indisponível'} · ${escapeHTML(publicationLabel(m.status))}<br>${e.progress||0} capítulos lidos</div><div class="scoreline"><span>★ <b>${val}</b> <span class="muted">${view==='descobrir'?'afinidade':'minha nota'}</span></span><em>◈ ${m.averageScore??'—'}</em></div></div></article>`}).join('');$('more').classList.toggle('hidden',a.length<=(shown||48));document.querySelectorAll('.manga').forEach(x=>{x.onclick=()=>openModal(Number(x.dataset.id));x.onkeydown=e=>{if(e.key==='Enter')openModal(Number(x.dataset.id))}})}
 
 const listDate=x=>x?.year?new Date(x.year,(x.month||1)-1,x.day||1):null;
 const dateLabel=x=>x?.year?`${String(x.day||1).padStart(2,'0')}/${String(x.month||1).padStart(2,'0')}/${x.year}`:'—';
@@ -276,21 +276,25 @@ async function atlasLookupOne(e){
 }
 async function atlasRefreshChapterReferences(force=false){
  if(atlasChapterLookupBusy||!entries.length)return;
+ // GitHub Pages é estático. APIs que bloqueiam CORS/403 não podem ser consultadas
+ // diretamente pelo navegador; não repetir dezenas de chamadas malsucedidas.
+ const blocked=(()=>{try{return JSON.parse(localStorage.getItem('atlas-chapter-api-blocked-v2')||'null')}catch{return null}})();
+ if(blocked&&Date.now()-blocked.at<7*86400000&&!force)return;
  atlasChapterLookupBusy=true;
- const btn=document.getElementById('atlasChapterRefresh');
- const note=document.getElementById('atlasChapterStatus');
- const list=entries.filter(e=>e.status==='CURRENT'&&e.media.status!=='FINISHED').sort((a,b)=>(b.progress||0)-(a.progress||0));
- const selected=list.filter(e=>force||!chapterSources[String(e.media.id)]?.checkedAt||Date.now()-Date.parse(chapterSources[String(e.media.id)].checkedAt)>86400000).slice(0,force?20:8);
- if(btn)btn.disabled=true;
- let ok=0,failed=0;atlasChapterLastErrors=[];
- for(let i=0;i<selected.length;i++){
-  if(note)note.textContent='Consultando MangaUpdates e MangaDex: '+(i+1)+'/'+selected.length+'…';
-  const r=await atlasLookupOne(selected[i]);
-  if(r.chapter)ok++;else {failed++;atlasChapterLastErrors.push(...(r.errors||[]));}
+ const list=entries.filter(e=>e.status==='CURRENT'&&e.media.status!=='FINISHED')
+  .sort((a,b)=>(b.progress||0)-(a.progress||0));
+ const selected=list.filter(e=>!chapterSources[String(e.media.id)]?.checkedAt||
+  Date.now()-Date.parse(chapterSources[String(e.media.id)].checkedAt)>7*86400000).slice(0,3);
+ let blockedErrors=[];
+ for(const e of selected){
+  const r=await atlasLookupOne(e);
+  blockedErrors.push(...(r.errors||[]).filter(x=>/403|failed to fetch|cors|networkerror/i.test(x)));
   if(view==='perfil')renderProfileRows();
+  if(blockedErrors.length>=2)break;
  }
- if(note)note.textContent=selected.length?`Consulta: ${ok} referências, ${failed} sem confirmação. ${atlasChapterLastErrors.length?'Erro de acesso às APIs: '+[...new Set(atlasChapterLastErrors)].slice(0,2).join(' | '):'Sem erros de conexão; títulos não encontrados ou sem capítulos numéricos.'} ${list.length>selected.length?'Consulte mais obras no próximo lote.':''}`:'Referências já consultadas recentemente.';
- if(btn)btn.disabled=false;
+ if(blockedErrors.length){
+  try{localStorage.setItem('atlas-chapter-api-blocked-v2',JSON.stringify({at:Date.now(),errors:[...new Set(blockedErrors)]}))}catch{}
+ }
  atlasChapterLookupBusy=false;
 }
 
@@ -400,23 +404,23 @@ function renderProfile(){
  root.innerHTML=`<div class="profile-header"><div class="eyebrow">SEU PERFIL DE LEITURA</div><h1>Biblioteca de ${escapeHTML(window.atlasCloud?.anilistUsername||'leitura')}</h1><div class="profile-kpis"><div><strong>${entries.length}</strong><small>Obras</small></div><div><strong>${entries.filter(e=>e.status==='CURRENT').length}</strong><small>Lendo</small></div><div><strong>${entries.filter(e=>e.status==='COMPLETED').length}</strong><small>Concluídas</small></div><div><strong>${average===null?'—':average.toFixed(2)}</strong><small>Nota média pessoal</small></div></div></div>
  <div class="profile-layout">
  <aside class="profile-side">
- <section class="profile-panel"><h3>Gêneros favoritos</h3><p class="muted mini">Por quantidade na coleção; a média considera apenas obras avaliadas.</p>${top.map(([g,v])=>`<div class="genre-mini"><div><b>${escapeHTML(g)}</b><span>${v.count} · ★ ${v.scores.length?mean(v.scores).toFixed(1):'—'}</span></div><div class="mini-bar"><i style="width:${v.count/max*100}%"></i></div></div>`).join('')}</section>
- <section class="profile-panel"><h3>Distribuição da coleção</h3>${counts.map(x=>`<div class="genre-mini"><div><b>${x.label}</b><span>${x.n}</span></div><div class="mini-bar"><i style="width:${x.n/entries.length*100}%"></i></div></div>`).join('')}</section>
+ <section class="profile-panel atlas-stat-detail"><h3>Gêneros favoritos</h3><p class="muted mini">Por quantidade na coleção; a média considera apenas obras avaliadas.</p>${top.map(([g,v])=>`<div class="genre-mini"><div><b>${escapeHTML(g)}</b><span>${v.count} · ★ ${v.scores.length?mean(v.scores).toFixed(1):'—'}</span></div><div class="mini-bar"><i style="width:${v.count/max*100}%"></i></div></div>`).join('')}</section>
+ <section class="profile-panel atlas-stat-detail"><h3>Distribuição da coleção</h3>${counts.map(x=>`<div class="genre-mini"><div><b>${x.label}</b><span>${x.n}</span></div><div class="mini-bar"><i style="width:${x.n/entries.length*100}%"></i></div></div>`).join('')}</section>
  </aside>
- <div class="profile-center"><section class="profile-panel atlas-chapter-panel"><div class="profile-panel-head"><h2>Capítulos publicados</h2><button type="button" class="sync" id="atlasChapterRefresh">↻ Conferir fontes</button></div><p class="muted mini" id="atlasChapterStatus">Referências consultadas no MangaUpdates e MangaDex. Traduções não são confundidas com capítulos originais.</p></section>
+ <div class="profile-center">
  <section class="profile-panel"><div class="profile-panel-head"><h2>Últimas leituras no AniList</h2><button class="sync" id="refreshActivity">↻ Atualizar feed</button></div><div class="recent-strip">${recent.length?recent.map(a=>`<button class="recent-item" data-profile-id="${a.media.id}"><img loading="lazy" src="${escapeHTML(profileCover(a.media))}" alt=""><strong>${escapeHTML(title(a.media))}</strong><small>${escapeHTML(activityText(a))}</small><small>${niceDate(activityDate(a))}</small></button>`).join(''):`<p class="muted">${escapeHTML(activityFeed?.error||'Consultando atividades do AniList…')}</p>`}</div><div class="activity-history"><h3>Histórico recente do AniList</h3>${activities.slice(0,15).map(a=>`<button class="activity-history-item" data-profile-id="${a.media.id}"><img src="${escapeHTML(profileCover(a.media))}" alt=""><span><b>${escapeHTML(title(a.media))}</b><small>${escapeHTML(activityText(a))}</small></span><time>${niceDate(activityDate(a))}</time></button>`).join('')}</div></section>
  <section class="profile-panel"><div class="profile-panel-head"><h2>Minha coleção</h2><span id="profileCount" class="muted">${rows.length} resultados</span></div>${profileFilters()}<div id="profileRows"></div><button class="sync" id="profileMore">Mostrar mais obras</button></section>
  </div>
  <aside class="profile-side">
- <section class="profile-panel"><h3>Atividades por dia da semana</h3><p class="muted mini">Distribuição dos ${activities.length} eventos recuperados do AniList. Percentuais sobre o total consultado, não horas de leitura.</p>${activityFeed?.error?`<p class="feed-error">${escapeHTML(activityFeed.error)}</p>`:!activityFeed?`<p class="muted mini">Aguardando consulta…</p>`:''}${weekChart}<h4 class="activity-subtitle">Horário das atividades</h4>${hourChart}<p class="muted mini">Horários em seu fuso local. Cada evento pode abranger vários capítulos; não mede tempo efetivo de leitura. A amostra pode ser parcial.</p></section>
+ <section class="profile-panel atlas-stat-detail"><h3>Atividades por dia da semana</h3><p class="muted mini">Distribuição dos ${activities.length} eventos recuperados do AniList. Percentuais sobre o total consultado, não horas de leitura.</p>${activityFeed?.error?`<p class="feed-error">${escapeHTML(activityFeed.error)}</p>`:!activityFeed?`<p class="muted mini">Aguardando consulta…</p>`:''}${weekChart}<h4 class="activity-subtitle">Horário das atividades</h4>${hourChart}<p class="muted mini">Horários em seu fuso local. Cada evento pode abranger vários capítulos; não mede tempo efetivo de leitura. A amostra pode ser parcial.</p></section>
  <section class="profile-panel"><h3>Leituras mais longas</h3><p class="muted mini">Dias desde o início registrado no AniList, não tempo efetivo de leitura.</p>${active.length?active.map(e=>`<button class="long-read" data-profile-id="${e.media.id}"><img src="${escapeHTML(pic(e.media))}" alt=""><span><b>${escapeHTML(title(e.media))}</b><small>${duration(e).toLocaleString('pt-BR')} dias · desde ${dateLabel(e.startedAt)}</small></span></button>`).join(''):'<p class="muted mini">Datas de início não disponíveis.</p>'}</section>
- <section class="profile-panel"><h3>Notas pessoais</h3><div class="grade-bars">${[10,9,8,7,6,5,4,3,2,1].map(n=>{let c=scored.filter(e=>Math.ceil(e.score)===n).length;return `<div><span>${n}</span><i style="height:${Math.max(3,c/Math.max(scored.length,1)*380)}px" title="${c} obras"></i></div>`}).join('')}</div><p class="muted mini">${scored.length} obras avaliadas · escala 1–10</p></section>
+ <section class="profile-panel atlas-stat-detail"><h3>Notas pessoais</h3><div class="grade-bars">${[10,9,8,7,6,5,4,3,2,1].map(n=>{let c=scored.filter(e=>Math.ceil(e.score)===n).length;return `<div><span>${n}</span><i style="height:${Math.max(3,c/Math.max(scored.length,1)*380)}px" title="${c} obras"></i></div>`}).join('')}</div><p class="muted mini">${scored.length} obras avaliadas · escala 1–10</p></section>
  </aside></div>`;
  $('profileSearch').oninput=e=>{profileQuery=e.target.value;profileLimit=45;renderProfileRows()};
  for(const id of ['profileClass','profileStatus','profileYear','profileAuthor','profileSort'])$(id).onchange=e=>{if(id==='profileClass')profileClass=e.target.value;else if(id==='profileStatus')profileStatus=e.target.value;else if(id==='profileYear')profileYear=e.target.value;else if(id==='profileAuthor')profileAuthor=e.target.value;else profileSort=e.target.value;profileLimit=45;renderProfileRows()};
  $('profileMore').onclick=()=>{profileLimit+=45;renderProfileRows()};
  $('refreshActivity').onclick=()=>fetchActivity(true);
- const chapterButton=$('atlasChapterRefresh');if(chapterButton)chapterButton.onclick=()=>atlasRefreshChapterReferences(true);
+ 
  if(!activityFeed&&!activityLoading)fetchActivity();
  renderProfileRows();attachProfileOpen(root);if(window.atlasAnimeProfile)window.atlasAnimeProfile(root);
 }
@@ -428,6 +432,17 @@ function renderProfileRows(){
  $('profileMore').classList.toggle('hidden',a.length<=profileLimit);attachProfileOpen(area);
 }
 
+function renderAtlasStatistics(){
+ const section=$('statsview');
+ let extra=document.getElementById('atlasStatsExtended');
+ if(!extra){extra=document.createElement('div');extra.id='atlasStatsExtended';section.appendChild(extra)}
+ const scored=entries.filter(e=>e.score>0),counts={};
+ for(const e of entries)counts[e.status]=(counts[e.status]||0)+1;
+ const n=entries.length||1;
+ const last=(()=>{try{return JSON.parse(localStorage.getItem('atlas-chapter-api-blocked-v2')||'null')}catch{return null}})();
+ const sourceStatus=last&&Date.now()-last.at<7*86400000?'Fontes externas temporariamente indisponíveis no navegador. A atualização automática foi suspensa por 7 dias para evitar chamadas repetidas. A integração por servidor será necessária para consultar essas fontes com confiabilidade.':'Consulta automática em segundo plano quando as fontes permitirem acesso.';
+ extra.innerHTML=`<div class="atlas-stats-overview"><h2>Visão geral da coleção</h2><div class="stats">${[['Obras',entries.length],['Lendo',counts.CURRENT||0],['Planejados',counts.PLANNING||0],['Concluídos',counts.COMPLETED||0],['Avaliados',scored.length],['Nota média',scored.length?(scored.reduce((t,e)=>t+e.score,0)/scored.length).toFixed(2):'—']].map(([label,value])=>'<div class="stat"><strong>'+value+'</strong><span>'+label+'</span></div>').join('')}</div><h3>Distribuição da biblioteca</h3>${Object.entries(counts).map(([status,num])=>'<div class="genre-mini"><div><b>'+escapeHTML(names[status]||status)+'</b><span>'+num+'</span></div><div class="mini-bar"><i style="width:'+(100*num/n)+'%"></i></div></div>').join('')}<h3>Capítulos publicados</h3><p class="muted">${escapeHTML(sourceStatus)}</p></div>`;
+}
 function renderGenres(){let d={};entries.forEach(e=>(e.media.genres||[]).forEach(g=>{let a=d[g]??={n:0,v:[]};a.n++;if(e.score>0)a.v.push(e.score)}));let max=Math.max(...Object.values(d).map(x=>x.n),1);$('genres').innerHTML=Object.entries(d).sort((a,b)=>b[1].n-a[1].n).map(([g,v])=>`<div class="genre"><b>${escapeHTML(g)}</b><div class="muted">${v.n} obras · média ${v.v.length?mean(v.v).toFixed(1):'—'}/10</div><div class="bar"><i style="width:${v.n/max*100}%"></i></div></div>`).join('')}
 
 function relTitle(m){return aliases[String(m.id)]||m.title?.english||m.title?.romaji||m.title?.native||'Sem título'}
