@@ -185,18 +185,23 @@ function progressState(e){
  const m=e.media,progress=Math.max(0,Number(e.progress)||0),latest=latestChapter(e);
  const isComplete=e.status==='COMPLETED';
  const isPublishedEnd=m.status==='FINISHED';
- // Finalizada: requer status COMPLETED e confirmação de capítulos finais quando conhecidos.
- const finished=isComplete&&latest!==null&&progress>=latest&&isPublishedEnd;
- // Sem capítulo total conhecido, não é possível afirmar que está em dia.
- const caughtUp=!finished&&latest!==null&&progress>=latest&&progress>0;
- const percent=latest!==null?Math.min(100,Math.round(100*progress/latest)):null;
+ const finished=isComplete&&isPublishedEnd;
+ const caughtUp=!isComplete&&latest!==null&&progress>=latest&&progress>0;
+ // A conclusão registrada pelo usuário é 100% da leitura, independentemente
+ // de a referência externa de capítulos estar disponível.
+ const percent=isComplete?100:latest!==null?Math.min(100,Math.round(100*progress/latest)):null;
  return {progress,latest,percent,finished,caughtUp,isComplete};
 }
 function progressMarkup(e){
- const v=progressState(e),cls=v.finished?'finished':v.caughtUp?'caught-up':'ongoing';
- const pct=v.percent===null?0:v.percent;
- const label=v.finished?'Obra finalizada e leitura concluída':v.caughtUp?'Em dia com a referência disponível':v.latest===null?'Capítulo mais recente não confirmado':`${v.percent}% · ${v.progress}/${v.latest} capítulos · ${chapterSourceInfo(e)}`;
- return `<div class="progress-wrap" title="${escapeHTML(label)}"><div class="profile-progress ${cls} ${v.percent===null?'unverified':''}"><i style="width:${pct}%"></i></div><span class="progress-caption">${v.percent===null?'Referência pendente':`${v.percent}% · ${v.progress}/${v.latest} cap.`}</span></div>`;
+ const v=progressState(e);
+ const cls=v.isComplete?'finished':v.caughtUp?'caught-up':'ongoing';
+ const unknown=v.percent===null;
+ // Sem total verificado, a barra é um indicador de leitura, não uma escala percentual.
+ const hasRead=unknown&&v.progress>0;
+ const pct=unknown?0:v.percent;
+ const label=v.isComplete?'Leitura marcada como concluída':v.caughtUp?'Em dia com a referência disponível':unknown?`${v.progress} capítulo(s) lido(s) · total ainda não confirmado`:`${v.percent}% · ${v.progress}/${v.latest} capítulos · ${chapterSourceInfo(e)}`;
+ const caption=v.isComplete?(v.latest!==null?`Concluído · ${v.progress}/${v.latest} cap.`:`Concluído · ${v.progress} cap. registrados`):unknown?(v.progress>0?`${v.progress} cap. lidos · total não confirmado`:'0 cap. lidos · total não confirmado'):`${v.percent}% · ${v.progress}/${v.latest} cap.`;
+ return `<div class="progress-wrap" title="${escapeHTML(label)}"><div class="profile-progress ${cls} ${unknown?'unverified':''} ${hasRead?'has-reading':''}" role="progressbar" aria-label="${escapeHTML(label)}" aria-valuemin="0" ${unknown?'':`aria-valuemax="100" aria-valuenow="${pct}"`}><i style="width:${pct}%"></i></div><span class="progress-caption">${caption}</span></div>`;
 }
 const activityDate=a=>Number(a?.createdAt)>0?new Date(a.createdAt*1000):null;
 const activityText=a=>{const st=(a.status||'').toLowerCase(),prog=a.progress||'';if(st.includes('read'))return 'Leu '+(prog?('capítulo(s) '+prog):'capítulos');if(st.includes('completed'))return 'Concluiu';if(st.includes('plans'))return 'Planeja ler';if(st.includes('dropped'))return 'Abandonou';if(st.includes('paused'))return 'Pausou';return a.status||'Atualizou a lista'};
@@ -820,4 +825,20 @@ window.addEventListener('atlas-cloud-ready',()=>{fetch('historico_crunchyroll.js
  #atlas-private #libraryContent>.atlas-submenus .nav{padding:8px 12px}
 }
 </style>
-<script type="module" src="atlas-cloud.js"></script></body></html>
+<style id="atlas-progress-v5">
+/* Progresso confirmado ou, quando não há total, leitura registrada sem percentual inventado. */
+#atlas-private .progress-wrap .profile-progress{height:9px;border-radius:999px;position:relative;overflow:hidden;background:#26384d}
+#atlas-private .progress-wrap .profile-progress i{display:block;height:100%;border-radius:inherit;transition:width .25s ease}
+#atlas-private .progress-wrap .profile-progress.unverified{background:#24364b}
+#atlas-private .progress-wrap .profile-progress.unverified i{display:none}
+#atlas-private .progress-wrap .profile-progress.unverified.has-reading::before{
+ content:"";position:absolute;inset:0;
+ background:repeating-linear-gradient(105deg,#226b7b 0px,#226b7b 10px,#2b8e9b 10px,#2b8e9b 18px);
+ opacity:.82;
+}
+#atlas-private .progress-wrap .profile-progress.unverified.has-reading::after{
+ content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#162a40 92%);
+}
+#atlas-private .progress-wrap .profile-progress.finished i{background:linear-gradient(90deg,#1fa950,#77ed76)}
+#atlas-private .progress-wrap .progress-caption{font-size:11px;line-height:1.45;color:#a8c9d1}
+</style><script type="module" src="atlas-cloud.js"></script></body></html>
