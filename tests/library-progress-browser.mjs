@@ -20,6 +20,7 @@ const responses={'/api/library':{data:{data:{MediaListCollection:{lists:[{entrie
 const cloud=`
 const responses=${JSON.stringify(responses)};
 window.atlasCloud={user:{id:'fixture'},fetch:async path=>new Response(JSON.stringify(responses[path]??{}),{headers:{'Content-Type':'application/json'}}),
+ animeAniListRead:async()=>({entries:[{anilist_id:55,status:'CURRENT',progress:2,payload:{media:{title:{english:'Anime do AniList'},status:'RELEASING',nextAiringEpisode:{episode:5}}}}],lastSuccess:'2026-01-01T12:00:00Z'}),
  animeProgressRead:async()=>({done:{userStatus:'COMPLETED'}})};
 document.getElementById('atlas-private').hidden=false;
 document.getElementById('atlas-access').hidden=true;
@@ -58,6 +59,9 @@ try{
  assert.ok(await manga('Fullmetal Alchemist').locator('[role=progressbar]').isVisible());
  const mangaImage=await page.locator('#grid').screenshot({path:'artifacts/mangas.png'});
  await page.locator('button[data-menu=animes]').click();
+ const aniListEntry=page.locator('#atlas-anilist-anime').getByText('Anime do AniList');
+ await aniListEntry.waitFor();
+ assert.match(await page.locator('#atlas-anilist-anime [role=progressbar]').getAttribute('aria-label'),/2\/4.*50%/);
  const cards=page.locator('.cr-anime-card');
  await cards.first().waitFor();
  const series=title=>cards.filter({hasText:title});

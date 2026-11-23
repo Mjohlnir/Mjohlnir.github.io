@@ -599,7 +599,7 @@ const date=s=>s?new Date(s).toLocaleDateString('pt-BR',{timeZone:'UTC'}):'—';
 const root=()=>document.getElementById('crunchyrollview');
 const bySeries=()=>{let map=new Map();for(const r of records){let k=r.series_id||('sem-id-'+r.id);let a=map.get(k);if(!a){a={id:k,title:r.series||'Título não identificado',rows:[],complete:0,years:new Set()};map.set(k,a)}a.rows.push(r);if(r.completed)a.complete++;if(r.date)a.years.add(r.date.slice(0,4))}return [...map.values()]};
 window.atlasAnimeBannerOptions=()=>bySeries().map(g=>({id:g.id,title:g.title,cover:coverCache[g.id]?.bannerImage||coverCache[g.id]?.url||'',score:Number(coverCache[g.id]?.averageScore)||0,views:g.rows.length}));
-async function load(){if(loaded)return;try{const r=await fetch('historico_crunchyroll.json');if(!r.ok)throw Error('HTTP '+r.status);records=await r.json();loaded=true;window.atlasCrunchyRecords=records;render();window.dispatchEvent(new Event('atlas-anime-loaded'))}catch(e){root().innerHTML='<h2>Histórico Crunchyroll</h2><p>Não foi possível abrir o histórico. Inicie pelo arquivo INICIAR_MANGA_ATLAS.bat. '+esc(e.message)+'</p>'}}
+async function load(){if(loaded)return;try{const r=await fetch('historico_crunchyroll.json');if(!r.ok)throw Error('HTTP '+r.status);records=await r.json();loaded=true;window.atlasCrunchyRecords=records;render();window.dispatchEvent(new Event('atlas-anime-loaded'))}catch(e){root().innerHTML='<h2>Histórico Crunchyroll</h2><p>Não foi possível abrir o histórico. '+esc(e.message)+'</p>'+aniListPanel();paintAniListAnime()}}
 const coverCache=(()=>{try{return JSON.parse(localStorage.getItem('atlasAnimeCoversV20')||'{}')}catch{return {}}})();
 const normalize=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const latestRow=g=>g.rows.reduce((a,b)=>!a||(b.date||'')>(a.date||'')?b:a,null);
@@ -691,7 +691,7 @@ root().innerHTML=`<div class="cr-hero atlas-category-banner" id="atlas-anime-ban
 <section class="atlas-showcase"><div class="atlas-section-heading"><h2>Mais bem avaliados da sua biblioteca</h2></div><div id="atlas-anime-ranked-library" class="atlas-ranked-grid"></div></section>
 <section class="atlas-showcase"><div class="atlas-section-heading"><h2>Em exibição nesta temporada</h2><span class="muted">${currentSeason().season==='FALL'?'Outono':currentSeason().season==='WINTER'?'Inverno':currentSeason().season==='SPRING'?'Primavera':'Verão'} ${currentSeason().year}</span></div><div id="atlas-season-list" class="atlas-season-grid">${seasonCache?'':'<p class="muted">Consultando os lançamentos no AniList…</p>'}</div></section>
 <section class="atlas-showcase"><div class="atlas-section-heading"><h2>Biblioteca de animes</h2><span class="muted" role="status">${filtered.length?'Mostrando '+Math.min(filtered.length,animeVisible)+' de '+filtered.length+' séries':'Nenhuma série encontrada'}</span></div><div class="cr-controls"><input id="cr-search" aria-label="Buscar séries na biblioteca" placeholder="Buscar anime…" value="${esc(query)}"><select id="cr-year"><option value="all">Todos os anos</option>${years.map(y=>`<option value="${y}" ${year===y?'selected':''}>${y}</option>`).join('')}</select><select id="cr-filter"><option value="all">Todos os registros</option><option value="complete" ${filter==='complete'?'selected':''}>Episódios concluídos</option><option value="partial" ${filter==='partial'?'selected':''}>Episódios pendentes</option><option value="unknown" ${filter==='unknown'?'selected':''}>Metadados ausentes</option></select><select id="cr-sort"><option value="score" ${sort==='score'?'selected':''}>Melhor avaliação AniList</option><option value="count" ${sort==='count'?'selected':''}>Mais reproduções</option><option value="recent" ${sort==='recent'?'selected':''}>Mais recentes</option><option value="alpha" ${sort==='alpha'?'selected':''}>Nome A–Z</option></select><button type="button" class="reset-filters" id="cr-reset">Limpar filtros</button><div class="view-switch" aria-label="Modo de visualização">${atlasLibrary.buttons(animeLayout,'data-anime-layout')}</div></div><div class="cr-list cr-anime-grid atlas-anime-layout-${animeLayout}">${filtered.slice(0,animeVisible).map(g=>{let r=latestRow(g);return `<article class="cr-item cr-anime-card"><button class="cr-series atlas-library-series" data-quick-series="${esc(g.id)}">${coverImg(g)}<div><span class="cr-anime-type">ANIME · CRUNCHYROLL</span><strong>${esc(g.title)}</strong><small data-score-series="${esc(g.id)}">${animeScore(g)?'★ '+(animeScore(g)/10).toFixed(1)+' / 10 · AniList':'—'}</small><small>${g.rows.length} reproduções · ${g.complete} marcadas como concluídas</small>${animeProgress(g)}<small>Último: ${r.metadata?'T'+(r.season??'?')+' · EP '+(r.episode??'?'):'sem identificação'} · ${date(r.date)}</small></div></button><button class="atlas-episode-toggle" data-series="${esc(g.id)}">${expanded===g.id?'Ocultar episódios −':'Ver episódios +'}</button>${expanded===g.id?`<div class="cr-episodes">${g.rows.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(r=>`<div class="atlas-anime-episode-row">${episodeThumb(g,r)}<div><b>${r.metadata?'T'+(r.season??'?')+' · EP '+(r.episode??'?'):'Episódio não identificado'}</b><small>${esc(r.title||'')}</small><small>${date(r.date)} · ${r.completed?'Assistido':(watchInfo(r).label||'Progresso indisponível')}</small></div></div>`).join('')}</div>`:''}</article>`}).join('')}</div>${filtered.length>animeVisible?`<button type="button" class="sync atlas-anime-more" id="atlas-anime-more">Mostrar mais ${Math.min(36,filtered.length-animeVisible)} animes</button>`:''}</section>
-<section class="atlas-showcase atlas-history-bottom"><div class="atlas-section-heading"><h2>Seu histórico Crunchyroll</h2></div><div class="cr-kpis"><div><strong>${n.toLocaleString('pt-BR')}</strong><small>Reproduções</small></div><div><strong>${groups.length}</strong><small>Séries / identificadores</small></div><div><strong>${done.toLocaleString('pt-BR')}</strong><small>Concluídas</small></div><div><strong>${unknown}</strong><small>Sem metadados</small></div></div><div class="atlas-section-heading atlas-small-heading"><h3>Assistidos recentemente</h3></div><div class="atlas-recent-featured">${recent.slice(0,6).map(recentCard).join('')}</div><div class="atlas-section-heading atlas-small-heading"><h3>Outras reproduções recentes</h3><div class="atlas-carousel-controls"><button type="button" data-slide="-1" aria-label="Voltar">‹</button><button type="button" data-slide="1" aria-label="Avançar">›</button></div></div><div class="atlas-recent-carousel" id="atlas-recent-carousel">${recent.slice(6,36).map(recentCard).join('')}</div></section>`;
+${aniListPanel()}<section class="atlas-showcase atlas-history-bottom"><div class="atlas-section-heading"><h2>Seu histórico Crunchyroll</h2></div><div class="cr-kpis"><div><strong>${n.toLocaleString('pt-BR')}</strong><small>Reproduções</small></div><div><strong>${groups.length}</strong><small>Séries / identificadores</small></div><div><strong>${done.toLocaleString('pt-BR')}</strong><small>Concluídas</small></div><div><strong>${unknown}</strong><small>Sem metadados</small></div></div><div class="atlas-section-heading atlas-small-heading"><h3>Assistidos recentemente</h3></div><div class="atlas-recent-featured">${recent.slice(0,6).map(recentCard).join('')}</div><div class="atlas-section-heading atlas-small-heading"><h3>Outras reproduções recentes</h3><div class="atlas-carousel-controls"><button type="button" data-slide="-1" aria-label="Voltar">‹</button><button type="button" data-slide="1" aria-label="Avançar">›</button></div></div><div class="atlas-recent-carousel" id="atlas-recent-carousel">${recent.slice(6,36).map(recentCard).join('')}</div></section>`;
 root().querySelector('#cr-reset').onclick=()=>{query='';year='all';filter='all';animeVisible=36;render();root().querySelector('#cr-search').focus()};
 root().querySelectorAll('[data-anime-layout]').forEach(button=>button.onclick=()=>{animeLayout=button.dataset.animeLayout;try{localStorage.setItem('atlas-anime-layout',animeLayout)}catch{};render();root().querySelector('[data-anime-layout="'+animeLayout+'"]').focus()});
 const more=root().querySelector('#atlas-anime-more');if(more)more.onclick=()=>{animeVisible+=36;render()};
@@ -699,11 +699,45 @@ root().querySelector('#cr-search').oninput=e=>{query=e.target.value;animeVisible
 root().querySelector('#cr-year').onchange=e=>{year=e.target.value;animeVisible=36;render()};root().querySelector('#cr-filter').onchange=e=>{filter=e.target.value;animeVisible=36;render()};root().querySelector('#cr-sort').onchange=e=>{sort=e.target.value;animeVisible=36;render()};root().querySelectorAll('[data-series]').forEach(b=>b.onclick=()=>{expanded=expanded===b.dataset.series?null:b.dataset.series;render()});
 root().querySelectorAll('[data-quick-series]').forEach(b=>b.onclick=()=>{if(window.atlasOpenAnimeQuick)window.atlasOpenAnimeQuick(b.dataset.quickSeries)});
 root().querySelectorAll('[data-slide]').forEach(b=>b.onclick=()=>root().querySelector('#atlas-recent-carousel').scrollBy({left:Number(b.dataset.slide)*650,behavior:'smooth'}));
-paintSeason();paintTopAnime();paintAnimeRatings();loadSeason();loadTopAnime();resolveCovers([...filtered.slice(0,animeVisible),...recent.slice(0,12)]);window.atlasCategoryBannerRender?.('animes');
+paintSeason();paintTopAnime();paintAnimeRatings();paintAniListAnime();loadSeason();loadTopAnime();resolveCovers([...filtered.slice(0,animeVisible),...recent.slice(0,12)]);window.atlasCategoryBannerRender?.('animes');
 }
 
 window.atlasRefreshAnimeProgress=()=>{if(loaded)render()};
-function show(){document.getElementById('mainContent').classList.add('hidden');document.getElementById('detailPage').classList.add('hidden');root().classList.remove('hidden');load()}
+let aniListCollection, aniListOwner, aniListLimit=24, aniListRequest=0;
+const aniListPanel=()=>"<section class=\"atlas-showcase\" id=\"atlas-anilist-anime\"><div class=\"atlas-section-heading\"><h2>Animes da sua coleção AniList</h2></div><p class=\"muted\" role=\"status\">Consultando a coleção AniList…</p><div class=\"atlas-ranked-grid\"></div><button type=\"button\" class=\"sync\" data-anilist-anime-more hidden>Mostrar mais animes AniList</button></section>";
+function paintAniListAnime(){
+ const section=root()?.querySelector('#atlas-anilist-anime');
+ if(!section||aniListOwner!==window.atlasCloud?.user?.id||!aniListCollection)return;
+ const {entries,lastSuccess,error}=aniListCollection;
+ section.querySelector('[role=status]').textContent=error||(lastSuccess?'Última sincronização: '+new Date(lastSuccess).toLocaleString('pt-BR'):
+  entries.length?'Coleção AniList disponível.':'Nenhum anime AniList sincronizado.');
+ section.querySelector('.atlas-ranked-grid').innerHTML=entries.slice(0,aniListLimit).map(entry=>{
+  const m=entry.payload?.media||{},name=m.title?.english||m.title?.romaji||m.title?.native||'Sem título';
+  const image=String(m.coverImage?.large||'');
+  const model=atlasLibrary.progress(entry.progress,atlasLibrary.publishedAnime(m),entry.status==='COMPLETED');
+  return '<a class="atlas-ranked-card" href="https://anilist.co/anime/'+Number(entry.anilist_id)+'" target="_blank" rel="noopener noreferrer">'+
+   (image.startsWith('https://')?'<img loading="lazy" src="'+esc(image)+'" alt="">':'')+
+   '<strong>'+esc(name)+'</strong>'+atlasLibrary.meter(model,{unit:'episódios assistidos'})+'</a>';
+ }).join('');
+ const more=section.querySelector('[data-anilist-anime-more]');
+ more.hidden=aniListLimit>=entries.length;
+ more.onclick=()=>{aniListLimit+=24;paintAniListAnime()};
+}
+async function loadAniListAnime(){
+ const owner=window.atlasCloud?.user?.id,read=window.atlasCloud?.animeAniListRead;
+ if(!owner||!read)return;
+ const request=++aniListRequest;
+ if(aniListOwner!==owner){aniListCollection=null;aniListLimit=24;}
+ aniListOwner=owner;
+ let data;
+ try{data=await read()}
+ catch{data={entries:[],error:'Não foi possível consultar a coleção AniList. O histórico Crunchyroll continua disponível.'}}
+ if(request!==aniListRequest||window.atlasCloud?.user?.id!==owner)return;
+ aniListCollection=data;
+ if(!root()?.querySelector('#atlas-anilist-anime'))root()?.insertAdjacentHTML('beforeend',aniListPanel());
+ paintAniListAnime();
+}
+function show(){document.getElementById('mainContent').classList.add('hidden');document.getElementById('detailPage').classList.add('hidden');root().classList.remove('hidden');load();void loadAniListAnime()}
 function hide(){root().classList.add('hidden')}
 document.querySelectorAll('button.nav').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.view==='crunchyroll'){document.querySelectorAll('button.nav').forEach(x=>x.classList.toggle('active',x===b));show()}else hide()}));
 // Existing navigation handler may run after ours. Ensure Crunchyroll view remains visible.

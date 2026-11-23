@@ -127,7 +127,25 @@ async function animeProgressSave(id,value){
  await setPref('anime-progress:'+id,saved);
  return saved;
 }
-window.atlasCloud={animeProgressRead,animeProgressSave,fetch:atlasFetch,user:null,anilistUsername:'',bannerRead:atlasBannerRead,bannerSave:atlasBannerSave,bannerUpload:atlasBannerUpload};
+async function animeAniListRead(){
+ const owner=account?.id;
+ if(!owner)return {entries:[],lastSuccess:null};
+ const entries=[];
+ for(let offset=0;offset<50000;offset+=1000){
+  const {data,error}=await db.from('library_entries').select('anilist_id,status,progress,payload')
+   .eq('user_id',owner).eq('media_type','ANIME').order('anilist_id').range(offset,offset+999);
+  if(error)throw error;
+  if(account?.id!==owner)throw Error('Sessão alterada.');
+  entries.push(...data);
+  if(data.length<1000){
+   const {data:state}=await db.from('sync_state').select('last_success').eq('user_id',owner).eq('media_type','ANIME').maybeSingle();
+   if(account?.id!==owner)throw Error('Sessão alterada.');
+   return {entries,lastSuccess:state?.last_success||null};
+  }
+ }
+ throw Error('Limite de paginação atingido.');
+}
+window.atlasCloud={animeAniListRead,animeProgressRead,animeProgressSave,fetch:atlasFetch,user:null,anilistUsername:'',bannerRead:atlasBannerRead,bannerSave:atlasBannerSave,bannerUpload:atlasBannerUpload};
 async function init(){if(!cfg.supabaseUrl?.startsWith('https://')||!cfg.supabaseAnonKey){message('Configuração Supabase ausente.',true);return;}try{db=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});const params=new URLSearchParams(location.search);if(params.get('error')){message('Autenticação: '+(params.get('error_description')||params.get('error')),true);history.replaceState({},'',location.pathname);}const {data,error}=await db.auth.getSession();if(error)throw error;await session(data.session);db.auth.onAuthStateChange((event,s)=>{if(event==='SIGNED_IN'||event==='SIGNED_OUT')setTimeout(()=>{if(event==='SIGNED_OUT')location.reload();else session(s);},0)});}catch(e){message('Não foi possível iniciar a autenticação: '+e.message,true);$('atlas-loading').hidden=true;}}
 $('atlas-magic-form').addEventListener('submit',async e=>{e.preventDefault();const input=$('atlas-email'),button=$('atlas-magic-button');button.disabled=true;message('Enviando link de acesso…');try{const {error}=await db.auth.signInWithOtp({email:input.value.trim(),options:{emailRedirectTo:cfg.siteUrl||location.origin+'/',shouldCreateUser:true}});if(error)throw error;$('atlas-magic-form').hidden=true;$('atlas-magic-sent').hidden=false;message('');}catch(e){message('Não foi possível enviar o link: '+e.message,true)}finally{button.disabled=false}});
 $('atlas-magic-again').onclick=()=>{$('atlas-magic-form').hidden=false;$('atlas-magic-sent').hidden=true;message('')};
